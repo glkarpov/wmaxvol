@@ -1,0 +1,15 @@
+*.pyc
+*~
+.DS_Store
+.*
+Icon?
+bmake/
+make_log_*
+lib/
+*.a
+*.so
+*.o
+*.log
+*.db
+.sw?
+
