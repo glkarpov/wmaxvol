@@ -1,3 +1,3 @@
-# make MaxVal even stronger. #
+# make MaxVol even stronger. #
 
-## Block MaxVal implementation ##
+## Block MaxVol implementation ##
