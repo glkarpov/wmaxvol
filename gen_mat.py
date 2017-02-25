@@ -42,7 +42,7 @@ def indeces_K_cut(l, maxn):
     """
     p = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
     while binom_sh(p, l) < maxn:
-        print 'THIS NEVER HAPPENS!!!\n'
+        print('THIS NEVER HAPPENS!!!\n')
         p += 1
     a = list(indeces_K(l, p))
     a = sorted(a, key=lambda e: max(e))
@@ -199,7 +199,7 @@ def PlotPoints(res, xout):
 
 
 if __name__ == '__main__':
-    print 'Test run'
+    print ('Test run')
 
     num_p = 4 # number of points we select from on each axis.
     l = 2
@@ -210,15 +210,15 @@ if __name__ == '__main__':
     w_in = np.array([list(w)]*l).T
     x_many, w_many  = CronProdX(w_in, x_in)
     A = GenMat(A_size, x_many)
-    print A.shape
-    print A
-    print "Rank =", np.linalg.matrix_rank(A)
+    print (A.shape)
+    print (A)
+    print ("Rank =", np.linalg.matrix_rank(A))
 
     # Random x's
     x_many = np.random.rand((num_p+1)**l, l)
     A = GenMat(A_size, x_many)
-    print A.shape
-    print "Rank (random matrx.) =", np.linalg.matrix_rank(A)
+    print (A.shape)
+    print ("Rank (random matrx.) =", np.linalg.matrix_rank(A))
 
     # MAXVOL!!!
     # New, big matrix!
@@ -231,7 +231,7 @@ if __name__ == '__main__':
     w_in = np.array([list(w)]*l).T
     x_many, w_many  = CronProdX(w_in, x_in)
     A = GenMat(A_size, x_many)
-    print "Rank (maxvol matrx) =", np.linalg.matrix_rank(A)
+    print ("Rank (maxvol matrx) =", np.linalg.matrix_rank(A))
 
     n2 = A.shape[0]/(l+1)
     for i in xrange(A.shape[0]):
