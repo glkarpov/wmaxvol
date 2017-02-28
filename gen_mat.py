@@ -7,6 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from numpy.polynomial.hermite import hermval
+from numpy.polynomial.chebyshev import chebval, chebder
+from numpy.polynomial import Chebyshev as T
 from scipy.special.orthogonal import h_roots
 import itertools
 import rect_maxvol
@@ -18,17 +20,19 @@ import rect_maxvol
 
 # Combinatorials funcs
 
+norm_cheb = 1.0/np.sqrt(np.pi/2.0)
+
 def binom_sh(p,l):
     """
     Shifted binomial:
     (p+l\\p) = (p+l)!/p!*l!
-    meaning number of monoms to approx. funcion, with l vars and poly. power <= p
+    meaning number of monoms to approx. function, with l vars and poly. power <= p
     """
     return np.math.factorial(p+l)/(np.math.factorial(p)*np.math.factorial(l))
 
 def indeces_K(l, p):
     """
-    returns all vectors of length l with sum of indeces <= p, starting form 0
+    returns all vectors of length l with sum of indices <= p, starting form 0
     """
     for cmb_u in itertools.combinations_with_replacement(xrange(p+1), l):
         for cmb in set(itertools.permutations(cmb_u)):
@@ -107,11 +111,26 @@ def herm_mult_many_diff(x, xi, diff_var, poly_func=None, poly_diff=None):
 
     return res
 
+# Some orthogonal polynomials
+
+def cheb(x, n):
+    """
+    returns T_n(x)
+    value of not normalized Chebyshev polynomial
+    $\int \frac1{\sqrt{1-x^2}}T_m(x)T_n(x) dx = \delta_{nm}$
+    """
+    return T.basis(n)(x)
+
+def cheb_diff(x, n):
+    return T.basis(n).deriv(1)(x)
+
+
+
 def herm(x, n):
     """
     returns H_n(x)
-    Nomed Probabilists polynomials
-    \int exp(-x^2/2)H_m(x)H_n(x) dx = \delta_{nm}
+    value of normalized Probabilistic polynomials
+    $\int exp(-x^2/2)H_m(x)H_n(x) dx = \delta_{nm}$
     """
     cf = np.zeros(n+1)
     cf[n] = 1
@@ -128,15 +147,23 @@ def herm_diff(x, n):
 def GenMat(n_size, x, poly=None, poly_diff=None, debug=False):
     """
     INPUT
-        n_size — number of cols (monoms), int
-        x — points, n2 x l numpy array (n2 is arbitrary integer, l — num of independent vars)
-
+        n_size — number of colomns (monoms), int
+        x — points, n2 x l numpy array (n2 is arbitrary integer, number of point, l — number of independent vars = number of derivatives  )
+    OUTPUT 
+        n2*(l+1) x n_size matrix A, such that 
+        a_{ij} = H_i(x_j) when i<l 
+        or a_{ij}=H'_{i mod l}(x_j), where derivatives are taken on coordinate with number i//l
     """
+
     n2, l = x.shape
-    nA = n2*(l+1)
+    nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
     A = np.zeros((nA, n_size))
+    if debug:
+        print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
 
     for i, xp in enumerate(indeces_K_cut(l, n_size)):
+        if debug:
+            print ('monom #{} is {}'.format(i, xp))
         A[0:n2, i] = herm_mult_many(x, xp, poly)
         for dl in xrange(1, l+1):
             A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
