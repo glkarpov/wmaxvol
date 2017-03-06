@@ -20,15 +20,27 @@ import rect_maxvol
 
 # Combinatorials funcs
 
-norm_cheb = 1.0/np.sqrt(np.pi/2.0)
+# norm_cheb = 1.0/np.sqrt(np.pi/2.0)
 
+def ReverseIdx(idx):
+    """
+    returns Reverse permutation
+    -1 on unknown places
+    """
+    n2 = max(idx) + 1
+    NumToIdxInv = np.full(n2, -1, dtype=int)
+    for ni, i in enumerate(idx):
+        NumToIdxInv[i] = ni
+
+    return NumToIdxInv
+# @jit('i8(i8,i8)')
 def binom_sh(p,l):
     """
     Shifted binomial:
     (p+l\\p) = (p+l)!/p!*l!
     meaning number of monoms to approx. function, with l vars and poly. power <= p
     """
-    return np.math.factorial(p+l)/(np.math.factorial(p)*np.math.factorial(l))
+    return int(  np.math.factorial(p+l)//(np.math.factorial(p)*np.math.factorial(l))  )
 
 def indeces_K(l, p):
     """
@@ -156,6 +168,15 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False):
     """
 
     n2, l = x.shape
+    if poly is not None:
+        if not isinstance(poly, list):
+            assert(callable(poly))
+            poly = [poly] * n_size
+    if poly_diff is not None:
+        if not isinstance(poly_diff, list):
+            assert(callable(poly_diff))
+            poly_diff = [poly_diff] * n_size
+
     nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
     A = np.zeros((nA, n_size))
     if debug:
@@ -190,7 +211,7 @@ def CronProdX(wts, rng):
 
     return x, w
 
-def RenormXAndIdx(res, x):
+def RenormXAndIdx(res, x, full=False):
     cf = x.shape[0]
     exists_idx = np.array(list(set( res % cf  )))
     resnew = np.zeros( (len(res), 2 ))
@@ -198,12 +219,17 @@ def RenormXAndIdx(res, x):
         n, pos = divmod(i, cf)
         resnew[idx, 0] = np.where(exists_idx==pos)[0][0]
         resnew[idx, 1] = n
-        
+
+    if full:
+        exists_idx = np.hstack((exists_idx, \
+                                np.setdiff1d(xrange(x.shape[0]), exists_idx)  ))
+        #                        np.array(list(set(range(x.shape[0])) - set(exists_idx) )) ))
     return resnew, x[exists_idx, :]
 
-def PlotPoints(res, xout):
-    plt.clf()
-    plt.hold()
+
+def PlotPoints(res, xout, fn='points', display=True):
+    # plt.clf()
+    # plt.hold()
     plt.scatter(xout[:,0], xout[:,1], facecolors='None', s=20)
     # plt.hold()
 
@@ -218,11 +244,12 @@ def PlotPoints(res, xout):
             color = 'g'
             ss_circ = 60
         assert(dl < 3)
-        plt.hold()
-        plt.scatter(xout[pos, 0], xout[pos, 1], facecolors=color, s=ss_circ, alpha=0.3, edgecolors='face')
-        plt.hold()
-    plt.savefig('points.pdf', bbox_inches='tight')
-    plt.show()
+        # plt.hold()
+        plt.scatter(xout[pos, 0], xout[pos, 1], facecolors=color, s=ss_circ, alpha=0.3, edgecolors='face', hold=True)
+        # plt.hold()
+    plt.savefig(fn + '.pdf', bbox_inches='tight')
+    if display:
+        plt.show()
 
 
 if __name__ == '__main__':
@@ -263,11 +290,13 @@ if __name__ == '__main__':
     n2 = A.shape[0]/(l+1)
     for i in xrange(A.shape[0]):
         A[i, :] *= w_many[i % n2]
-    res, _ = rect_maxvol.rect_maxvol(A, minK=A_size, maxK=A_size)
+    res, _ = rect_maxvol.rect_maxvol(A, minK=A_size, maxK=A_size, tol=1.0, start_maxvol_iters=10000)
     A = A[res, :]
 
     # remove unnecessary x
     res, x = RenormXAndIdx(res, x_many)
     PlotPoints(res, x)
+
+
 
 
