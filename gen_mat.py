@@ -214,7 +214,7 @@ def CronProdX(wts, rng):
 def RenormXAndIdx(res, x, full=False):
     cf = x.shape[0]
     exists_idx = np.array(list(set( res % cf  )))
-    resnew = np.zeros( (len(res), 2 ))
+    resnew = np.zeros( (len(res), 2 ), dtype=int)
     for idx, i in enumerate(res):
         n, pos = divmod(i, cf)
         resnew[idx, 0] = np.where(exists_idx==pos)[0][0]
