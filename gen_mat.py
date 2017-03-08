@@ -9,6 +9,7 @@ import scipy
 from numpy.polynomial.hermite import hermval
 from numpy.polynomial.chebyshev import chebval, chebder
 from numpy.polynomial import Chebyshev as T
+from numpy.polynomial import Hermite as H
 from scipy.special.orthogonal import h_roots
 import itertools
 import rect_maxvol
@@ -129,7 +130,7 @@ def cheb(x, n):
     """
     returns T_n(x)
     value of not normalized Chebyshev polynomial
-    $\int \frac1{\sqrt{1-x^2}}T_m(x)T_n(x) dx = \delta_{nm}$
+    $\int \frac1{\sqrt{1-x^2}}T_m(x)T_n(x) dx = \frac\pi2\delta_{nm}$
     """
     return T.basis(n)(x)
 
@@ -151,8 +152,14 @@ def herm(x, n):
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
 
+
 def herm_diff(x, n):
-    return x*herm(x, n-1) if n>0 else 0
+    if n <= 0:
+        return 0
+    cf = np.zeros(n)
+    cf[n-1] = 1
+    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n)))
+    return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)/nc
 
 # Main func
 
@@ -171,11 +178,11 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False):
     if poly is not None:
         if not isinstance(poly, list):
             assert(callable(poly))
-            poly = [poly] * n_size
+            poly = [poly] * l
     if poly_diff is not None:
         if not isinstance(poly_diff, list):
             assert(callable(poly_diff))
-            poly_diff = [poly_diff] * n_size
+            poly_diff = [poly_diff] * l
 
     nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
     A = np.zeros((nA, n_size))
