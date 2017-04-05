@@ -20,7 +20,7 @@ def cheb_diff(x, n):
 def Gen_1D(n_size, x, debug=False):
     l = x.shape[0]
     n2 = l * 2
-    A = np.zeros((n2, n_size))
+    A = np.zeros((n2, n_size), dtype=float)
     if debug:
         print('number of points(l) = {},  number of monoms(n_size) = {}'.format(l, n_size))
     
