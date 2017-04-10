@@ -1,4 +1,5 @@
 import numpy as np
+from maxvolpy.maxvol import maxvol
 def pluq_ids(A, debug = True):
     def mov_permute(C, j, ind, m = 'P'):
         if m == 'P':
@@ -48,16 +49,16 @@ def pluq_ids(A, debug = True):
     
     for j in range(0, m, 2):
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
-        ### 'k'- is a counter of pairs, i.e. with each slice there is 1 pair less
+        ### 'k'- pair counter, which starts from current j position till the bottom of the matrix
         max_det = np.zeros((2), dtype=float)
-        for k in range(j,n/2):
-            pair = np.concatenate((U[k,j:],U[k+n/2,j:])).reshape(2,m-j).T
+        for k in range(j,n,2):
+            pair = np.concatenate((U[k,j:],U[k+1,j:])).reshape(2,m-j).T
             piv,_ = maxvol(pair)
-            
+            print pair
             if np.abs(np.linalg.det(pair[piv])) > max_det[0]:
                 max_det[0], max_det[1] = np.abs(np.linalg.det(pair[piv])), k
          
-        pair = np.concatenate((U[max_det[1].astype(int),j:],U[max_det[1].astype(int)+n/2,j:])).reshape(2,m-j).T
+        pair = np.concatenate((U[max_det[1].astype(int),j:],U[max_det[1].astype(int)+1,j:])).reshape(2,m-j).T
         piv,_ = maxvol(pair)
         piv.sort()  
         
@@ -69,7 +70,7 @@ def pluq_ids(A, debug = True):
                 print('correct 2x2 matrix')
               
             print ('on the', j, 'slice')
-            print ('best row block is', max_det[1].astype(int), max_det[1].astype(int) + n/2)
+            print ('best row block is', max_det[1].astype(int), max_det[1].astype(int) + 1)
             print ('column coordinates:', piv[0] + j, piv[1] + j)
             print ('maxvol 2x2 submatrix', pair[piv.T])
             print ('with det = ', max_det[0])
@@ -91,7 +92,7 @@ def pluq_ids(A, debug = True):
         elimination(L,U,j)     
         
         #choosing second element to pivot. 
-        yx[0] = max_det[1] + n/2 
+        yx[0] = max_det[1] + 1 
         yx[1] = piv[1] + j
     
 
