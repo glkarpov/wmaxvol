@@ -88,8 +88,11 @@ def herm_mult_many(x, xi, poly_func=None):
     if poly_func is None:
         poly_func = [herm] * l
 
-    res = np.ones(N)
-    for n in xrange(l):
+    # res = np.ones(N)
+    # for n in xrange(l):
+    #    res *= poly_func[n](x[:, n], xi[n])
+    res = poly_func[0](x[:, 0], xi[0])
+    for n in xrange(1,l):
         res *= poly_func[n](x[:, n], xi[n])
 
     return res
