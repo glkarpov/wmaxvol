@@ -113,7 +113,7 @@ def pluq_ids(A, debug = True):
                 yx[1] = piv[1]+ j                 
 
             ### U moving ###
-            mov_LU(U,j+1,yx[0],yx[1])a
+            mov_LU(U,j+1,yx[0],yx[1])
             ####
             print U
             ### L moving ###
