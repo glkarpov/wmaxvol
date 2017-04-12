@@ -60,11 +60,18 @@ def pluq_ids(A, debug = True):
          
         pair = np.concatenate((U[max_det[1].astype(int),j:],U[max_det[1].astype(int)+1,j:])).reshape(2,m-j).T
         piv,_ = maxvol(pair)
-        piv.sort()  
+        piv.sort() 
         
-        yx[0] = max_det[1] 
-        yx[1] = piv[0]+ j
-    
+        diag = False
+        if (pair[piv][0,0]== 0) or (pair[piv][1,1] == 0):
+            yx[0] = max_det[1] 
+            yx[1] = piv[1]+ j
+            diag = True
+        else:
+        
+            yx[0] = max_det[1] 
+            yx[1] = piv[0]+ j 
+            
         if (debug):
             if np.linalg.det(pair[piv]) == max_det[0]:
                 print('correct 2x2 matrix')
@@ -72,14 +79,15 @@ def pluq_ids(A, debug = True):
             print ('on the', j, 'slice')
             print ('best row block is', max_det[1].astype(int), max_det[1].astype(int) + 1)
             print ('column coordinates:', piv[0] + j, piv[1] + j)
-            print ('maxvol 2x2 submatrix', pair[piv.T])
+            print ('maxvol 2x2 submatrix', pair[piv])
             print ('with det = ', max_det[0])
             print ('pivoting and permutations start...')
+            
             
         ### U moving ###
         mov_LU(U,j,yx[0],yx[1])
         ####
-        
+        print U
         ### L moving ###
         mov_LU(L,j,yx[0],yx[1],m='L')
         ###
@@ -90,25 +98,33 @@ def pluq_ids(A, debug = True):
         
         ### make them all zeros! Below (j,j) element
         elimination(L,U,j)     
-        
+        print U
         #choosing second element to pivot. 
-        yx[0] = max_det[1] + 1 
-        yx[1] = piv[1] + j
-    
+        ### if true, it means we do not have to permute another one time, because it will return to the initial condition 
+        if (j,j+1) == (piv[0]+j,piv[1]+j):
+            
+            elimination(L,U,j+1)
+        else:
+            if diag == True:
+                yx[0] = max_det[1] + 1
+                yx[1] = piv[0]+ j 
+            else:
+                yx[0] = max_det[1] + 1
+                yx[1] = piv[1]+ j                 
 
-        ### U moving ###
-        mov_LU(U,j+1,yx[0],yx[1])
-        ####
-        
-        ### L moving ###
-        mov_LU(L,j+1,yx[0],yx[1],m='L')
-        ###
-        
-        ### P&Q moving ###
-        mov_permute(P,j+1,yx[0])
-        mov_permute(Q,j+1,yx[1], m='Q')
-        
-        ### make them all zeros! (Below (j+1,j+1) element) ###
-        elimination(L,U,j+1)
-           
+            ### U moving ###
+            mov_LU(U,j+1,yx[0],yx[1])
+            ####
+            print U
+            ### L moving ###
+            mov_LU(L,j+1,yx[0],yx[1],m='L')
+            ###
+
+            ### P&Q moving ###
+            mov_permute(P,j+1,yx[0])
+            mov_permute(Q,j+1,yx[1], m='Q')
+
+            ### make them all zeros! (Below (j+1,j+1) element) ###
+            elimination(L,U,j+1)
+        print U
     return(P,L,U,Q)  
