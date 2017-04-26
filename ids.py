@@ -102,7 +102,17 @@ def pluq_ids(A, debug = True):
         #choosing second element to pivot. 
         ### if true, it means we do not have to permute another one time, because it will return to the initial condition 
         if (j,j+1) == (piv[0]+j,piv[1]+j):
-            
+            yx[0] = max_det[1] + 1
+            ### U moving ###
+            mov_LU(U,j+1,yx[0],j+1)
+            ####
+            print U
+            ### L moving ###
+            mov_LU(L,j+1,yx[0],j+1,m='L')
+            ###
+
+            ### P&Q moving ###
+            mov_permute(P,j+1,yx[0])            
             elimination(L,U,j+1)
         else:
             if diag == True:
