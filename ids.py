@@ -38,9 +38,7 @@ def pluq_ids(A, debug = True):
     
     n, m = A.shape[0], A.shape[1]
     P = np.eye((n), dtype=float)
-    L = np.eye((m), dtype=float)
-    L_add = np.zeros((n-m, m), dtype=float)
-    L = np.concatenate((L, L_add), axis = 0)
+    L = np.eye(n, m, dtype=float)
     U = np.copy(A)
     Q = np.eye((m), dtype=float)
     yx = np.array([0, 0], dtype=int)
@@ -54,7 +52,6 @@ def pluq_ids(A, debug = True):
         for k in range(j,n,2):
             pair = np.concatenate((U[k,j:],U[k+1,j:])).reshape(2,m-j).T
             piv,_ = maxvol(pair)
-            print pair
             if np.abs(np.linalg.det(pair[piv])) > max_det[0]:
                 max_det[0], max_det[1] = np.abs(np.linalg.det(pair[piv])), k
          
@@ -87,7 +84,8 @@ def pluq_ids(A, debug = True):
         ### U moving ###
         mov_LU(U,j,yx[0],yx[1])
         ####
-        print U
+        if (debug):
+            print U
         ### L moving ###
         mov_LU(L,j,yx[0],yx[1],m='L')
         ###
@@ -98,15 +96,18 @@ def pluq_ids(A, debug = True):
         
         ### make them all zeros! Below (j,j) element
         elimination(L,U,j)     
-        print U
+        if (debug):
+            print (U)
+                
         #choosing second element to pivot. 
-        ### if true, it means we do not have to permute another one time, because it will return to the initial condition 
+        ### if true, it means we do not have to permute COLUMNS (but still have to permute rows) another one time, because it will return to the initial condition 
         if (j,j+1) == (piv[0]+j,piv[1]+j):
             yx[0] = max_det[1] + 1
             ### U moving ###
             mov_LU(U,j+1,yx[0],j+1)
             ####
-            print U
+            if (debug):
+                print U
             ### L moving ###
             mov_LU(L,j+1,yx[0],j+1,m='L')
             ###
@@ -125,7 +126,7 @@ def pluq_ids(A, debug = True):
             ### U moving ###
             mov_LU(U,j+1,yx[0],yx[1])
             ####
-            print U
+            
             ### L moving ###
             mov_LU(L,j+1,yx[0],yx[1],m='L')
             ###
@@ -136,5 +137,5 @@ def pluq_ids(A, debug = True):
 
             ### make them all zeros! (Below (j+1,j+1) element) ###
             elimination(L,U,j+1)
-        print U
+        
     return(P,L,U,Q)  
