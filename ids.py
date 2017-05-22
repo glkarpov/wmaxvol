@@ -1,22 +1,28 @@
 import numpy as np
 from maxvolpy.maxvol import maxvol
+
+def perm_matrix(p, m = 'P'):
+    p_m = np.zeros((p.shape[0],p.shape[0]),dtype=float)
+    if m == 'P':
+        for i in range(0,p.shape[0]):     
+            p_m[i,p[i]] = 1.0
+    if m == 'Q':
+        for i in range(0,p.shape[0]):     
+            p_m[p[i],i] = 1.0
+        
+    return p_m
+
 def pluq_ids(A, debug = True):
-    def mov_permute(C, j, ind, m = 'P'):
-        if m == 'P':
-            temp = np.copy(C[ind,:])
-            C[ind,:] = C[j, :]
-            C[j, :] = temp
-        if m == 'Q':
-            temp = np.copy(C[:,ind])
-            C[:,ind] = C[:,j]
-            C[:,j] = temp
+    def mov_permute(C, j, ind):
+        C[ind],C[j]=C[j],C[ind]
         return()  
     def mov_LU(C, j, ind_r, ind_c, m = 'U'):
         if m == 'U':
+            
             temp = np.copy(C[ind_r,:])
             C[ind_r,:] = C[j, :]
             C[j, :] = temp
-        
+
             temp = np.copy(C[:,ind_c])
             C[:, ind_c] = C[:,j]
             C[:, j] = temp
@@ -37,10 +43,10 @@ def pluq_ids(A, debug = True):
         return ()    
     
     n, m = A.shape[0], A.shape[1]
-    P = np.eye((n), dtype=float)
+    P = np.arange(n)
     L = np.eye(n, m, dtype=float)
     U = np.copy(A)
-    Q = np.eye((m), dtype=float)
+    Q = np.arange(m)
     yx = np.array([0, 0], dtype=int)
     max_det = np.zeros((2), dtype=float)
     
@@ -92,7 +98,7 @@ def pluq_ids(A, debug = True):
         
         ### P&Q moving ###
         mov_permute(P,j,yx[0])
-        mov_permute(Q,j,yx[1], m='Q')
+        mov_permute(Q,j,yx[1])
         
         ### make them all zeros! Below (j,j) element
         elimination(L,U,j)     
@@ -113,7 +119,7 @@ def pluq_ids(A, debug = True):
             ###
 
             ### P&Q moving ###
-            mov_permute(P,j+1,yx[0])            
+            mov_permute(P,j+1,yx[0])  
             elimination(L,U,j+1)
         else:
             if diag == True:
@@ -133,9 +139,10 @@ def pluq_ids(A, debug = True):
 
             ### P&Q moving ###
             mov_permute(P,j+1,yx[0])
-            mov_permute(Q,j+1,yx[1], m='Q')
+            mov_permute(Q,j+1,yx[1])
 
             ### make them all zeros! (Below (j+1,j+1) element) ###
             elimination(L,U,j+1)
-        
+        print('after slice')
+        print U
     return(P,L,U,Q)  
