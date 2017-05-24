@@ -96,16 +96,17 @@ def pluq_ids(A, debug = False):
                 return (P,L,U,Q,info)
                 
             black_list.append(row_n)
-        pair = A[row_n:row_n +2][:,j:].T
+        pair = U[row_n:row_n +2][:,j:].T
         piv,_ = maxvol(pair)
         piv.sort() 
         diag = False
-        if (pair[piv].T[0,0]== 0) or (pair[piv].T[1,1] == 0):
+        if (pair[piv][0,0]== 0) or (pair[piv][1,1] == 0):
             yx[0] = row_n 
             yx[1] = piv[1]+ j
             diag = True
             if debug:
                 print ('diag case')
+                print (pair[piv].T)
         else:
         
             yx[0] = row_n
