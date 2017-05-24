@@ -52,10 +52,13 @@ def pluq_ids(A, debug = False):
         row = start_ind1 
         for k in range(start_ind1,A.shape[0],2):
             if k not in black_list:
-                pair = np.concatenate((A[k,start_ind2:],A[k+1,start_ind2:])).reshape(2,m-j).T
-                piv,_ = maxvol(pair)
-                if np.abs(np.linalg.det(pair[piv])) > det:
-                    det, row = np.abs(np.linalg.det(pair[piv])), k
+                
+                # pair = np.concatenate((A[k,start_ind2:],A[k+1,start_ind2:])).reshape(2,m-j).T
+                pair = A[k:k+2][:,start_ind2:].T
+                if np.linalg.matrix_rank(pair) == 2 :
+                    piv,_ = maxvol(pair)
+                    if np.abs(np.linalg.det(pair[piv])) > det:
+                        det, row = np.abs(np.linalg.det(pair[piv])), k
         return(det, row)        
                 
     n, m = A.shape[0], A.shape[1]
@@ -83,6 +86,8 @@ def pluq_ids(A, debug = False):
             j = j - 2
             restore_lu(L,U,j+1)
             restore_lu(L,U,j)
+            print ('restored matrix')
+            print (U)
             max_det, row_n = det_search(U,j+2,j)
             if max_det == 0.0:
                 # Critical error = all elements are in blacklist
