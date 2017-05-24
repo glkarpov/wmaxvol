@@ -53,7 +53,7 @@ def pluq_ids(A, debug = False):
         for k in range(start_ind1,A.shape[0],2):
             if k not in black_list:
                 
-                # pair = np.concatenate((A[k,start_ind2:],A[k+1,start_ind2:])).reshape(2,m-j).T
+                #pair = np.concatenate((A[k,start_ind2:],A[k+1,start_ind2:])).reshape(2,m-j).T
                 pair = A[k:k+2][:,start_ind2:].T
                 if np.linalg.matrix_rank(pair) == 2 :
                     piv,_ = maxvol(pair)
@@ -97,8 +97,10 @@ def pluq_ids(A, debug = False):
                 
             black_list.append(row_n)
         pair = U[row_n:row_n +2][:,j:].T
+        #pair = np.concatenate((U[row_n,j:],U[row_n + 1,j:])).reshape(2,m-j).T
         piv,_ = maxvol(pair)
         piv.sort() 
+        
         diag = False
         if (pair[piv][0,0]== 0) or (pair[piv][1,1] == 0):
             yx[0] = row_n 
@@ -106,7 +108,7 @@ def pluq_ids(A, debug = False):
             diag = True
             if debug:
                 print ('diag case')
-                print (pair[piv].T)
+                print (pair[piv])
         else:
         
             yx[0] = row_n
@@ -159,13 +161,14 @@ def pluq_ids(A, debug = False):
             mov_permute(P,j+1,yx[0])  
 
         else:
-            if (diag == True) and (j != piv[0]):                    
+            if (diag == True) and (j != (piv[0] + j)):                    
                 yx[0] = row_n + 1
                 yx[1] = piv[0]+ j 
+                print ('fdfds')
             else:
                 yx[0] = row_n + 1
                 yx[1] = piv[1]+ j                 
-
+            print (diag, yx, j, piv)
             ### U moving ###
             mov_LU(U,j+1,yx[0],yx[1])
             ####
