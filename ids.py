@@ -86,8 +86,9 @@ def pluq_ids(A, debug = False):
             j = j - 2
             restore_lu(L,U,j+1)
             restore_lu(L,U,j)
-            print ('restored matrix')
-            print (U)
+            if debug:
+            	print ('restored matrix')
+            	print (U)
             max_det, row_n = det_search(U,j+2,j)
             if max_det == 0.0:
                 # Critical error = all elements are in blacklist
