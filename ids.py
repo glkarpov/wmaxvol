@@ -119,8 +119,7 @@ def pluq_ids(A, debug = False):
         ### U moving ###
         mov_LU(U,j,yx[0],yx[1])
         ####
-        if (debug):
-            print U
+
         ### L moving ###
         mov_LU(L,j,yx[0],yx[1],m='L')
         ###
@@ -142,7 +141,7 @@ def pluq_ids(A, debug = False):
             mov_LU(U,j+1,yx[0],j+1)
             ####
             if (debug):
-                print ('after 2nd pivot')
+                print ('after 2nd pivot, ')
                 print U
             ### L moving ###
             mov_LU(L,j+1,yx[0],j+1,m='L')
@@ -152,7 +151,7 @@ def pluq_ids(A, debug = False):
             mov_permute(P,j+1,yx[0])  
 
         else:
-            if diag == True:
+            if (diag == True) and (j != piv[0]):                    
                 yx[0] = row_n + 1
                 yx[1] = piv[0]+ j 
             else:
