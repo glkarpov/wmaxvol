@@ -77,6 +77,7 @@ def pluq_ids(A, debug = False):
     yx = np.array([0, 0], dtype=int)
     black_list = []
     info = np.zeros((2), dtype=int)
+    treshold = 1e-10
     j = 0
     while (j < m):
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
@@ -92,8 +93,7 @@ def pluq_ids(A, debug = False):
                 print('error found')
             info[1] += 1
             j = j - 2
-            restore_lu(L,U,j+1)
-            restore_lu(L,U,j)
+            restore_layer(L,U,j)
             if debug:
             	print ('restored matrix')
             	print (U)
@@ -105,12 +105,11 @@ def pluq_ids(A, debug = False):
                 
             black_list.append(row_n)
         pair = U[row_n:row_n +2][:,j:].T
-        #pair = np.concatenate((U[row_n,j:],U[row_n + 1,j:])).reshape(2,m-j).T
         piv,_ = maxvol(pair)
         piv.sort() 
         
         diag = False
-        if (pair[piv][0,0]== 0) or (pair[piv][1,1] == 0):
+        if (np.abs(pair[piv][0,0]) < treshold) or (np.abs(pair[piv][1,1]) < treshold):
             yx[0] = row_n 
             yx[1] = piv[1]+ j
             diag = True
@@ -159,7 +158,7 @@ def pluq_ids(A, debug = False):
             mov_LU(U,j+1,yx[0],j+1)
             ####
             if (debug):
-                print ('after 2nd pivot, ')
+                print ('piv-neighbours case, after 2nd pivot, ')
                 print U
             ### L moving ###
             mov_LU(L,j+1,yx[0],j+1,m='L')
@@ -202,7 +201,7 @@ def pluq_ids(A, debug = False):
         elimination(L,U,j+1)
         j = j + 2
         if (debug):
-            print('after 2nd ilimination')
+            print('after 2nd elimination')
             print U
         
     return(P,L,U,Q,info)  
