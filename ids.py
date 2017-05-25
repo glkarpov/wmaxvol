@@ -41,10 +41,20 @@ def pluq_ids(A, debug = False):
             L[i,ind] = U[i,ind]/U[ind,ind]
             U[i,ind:] -= L[i,ind]*U[ind,ind:] 
         return ()    
+    
     def restore_lu(L,U,ind):
         k = L.shape[0]
         for i in range(ind+1, k):
             U[i,ind:] += L[i,ind]*U[ind,ind:]
+        return (U)
+    
+    def restore_layer(L,U,ind):
+        k = L.shape[0]
+        down_ind = ind + 1
+        for i in range(down_ind+1, k):
+            U[i,down_ind:] += L[i,down_ind]*U[down_ind,down_ind:]
+        for i in range(ind+1, k):
+            U[i,ind:] += L[i,ind]*U[ind,ind:]    
         return (U)
     
     def det_search(A,start_ind1, start_ind2):
@@ -52,8 +62,6 @@ def pluq_ids(A, debug = False):
         row = start_ind1 
         for k in range(start_ind1,A.shape[0],2):
             if k not in black_list:
-                
-                #pair = np.concatenate((A[k,start_ind2:],A[k+1,start_ind2:])).reshape(2,m-j).T
                 pair = A[k:k+2][:,start_ind2:].T
                 if np.linalg.matrix_rank(pair) == 2 :
                     piv,_ = maxvol(pair)
@@ -145,7 +153,7 @@ def pluq_ids(A, debug = False):
                 
         #choosing second element to pivot. 
         ### if true, it means we do not have to permute COLUMNS (but still have to permute rows) another one time, because it will return to the initial condition 
-        if (j,j+1) == (piv[0]+j,piv[1]+j):
+        if (0,1) == (piv[0],piv[1]):
             yx[0] = row_n + 1
             ### U moving ###
             mov_LU(U,j+1,yx[0],j+1)
@@ -161,14 +169,15 @@ def pluq_ids(A, debug = False):
             mov_permute(P,j+1,yx[0])  
 
         else:
-            if (diag == True) and (j != (piv[0] + j)):                    
+            if (diag == True) and (piv[0] != 0):                    
                 yx[0] = row_n + 1
                 yx[1] = piv[0]+ j 
-                print ('fdfds')
+                if debug:
+                    print ('diag case')
             else:
                 yx[0] = row_n + 1
                 yx[1] = piv[1]+ j                 
-            print (diag, yx, j, piv)
+            
             ### U moving ###
             mov_LU(U,j+1,yx[0],yx[1])
             ####
