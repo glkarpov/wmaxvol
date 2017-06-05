@@ -50,7 +50,7 @@ def indeces_K(l, q, p=1):
     """
     for cmb_u in itertools.combinations_with_replacement(xrange(q+1), l):
         for cmb in set(itertools.permutations(cmb_u)):
-            if sum(cmb**p) <= q:
+            if sum(np.array(cmb)**p) <= q:
                 yield cmb
 
 def indeces_K_cut(l, maxn, p=1):
