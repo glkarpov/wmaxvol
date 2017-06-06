@@ -10,9 +10,9 @@ from numpy.polynomial.hermite import hermval
 from numpy.polynomial.chebyshev import chebval, chebder
 from numpy.polynomial import Chebyshev as T
 from numpy.polynomial import Hermite as H
+from numpy.polynomial import Legendre as L
 from scipy.special.orthogonal import h_roots
 import itertools
-import rect_maxvol
 # from scipy.linalg import solve_triangular, get_lapack_funcs, get_blas_funcs
 # import sympy
 # from sympy import *
@@ -43,25 +43,26 @@ def binom_sh(p,l):
     """
     return int(  np.math.factorial(p+l)//(np.math.factorial(p)*np.math.factorial(l))  )
 
-def indeces_K(l, p):
+def indeces_K(l, q, p=1):
     """
-    returns all vectors of length l with sum of indices <= p, starting form 0
+    returns all vectors of length l with sum of indices in power p <= q, starting form 0
+    x^p + y^p <= q
     """
-    for cmb_u in itertools.combinations_with_replacement(xrange(p+1), l):
+    for cmb_u in itertools.combinations_with_replacement(xrange(q+1), l):
         for cmb in set(itertools.permutations(cmb_u)):
-            if sum(cmb) <= p:
+            if sum(np.array(cmb)**p) <= q:
                 yield cmb
 
-def indeces_K_cut(l, maxn):
+def indeces_K_cut(l, maxn, p=1):
     """
     MAGIC FUNCTION
-    p is determines automatically
+    q is determines automatically
     """
-    p = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
-    while binom_sh(p, l) < maxn:
+    q = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
+    while binom_sh(q, l) < maxn:
         print('THIS NEVER HAPPENS!!!\n')
-        p += 1
-    a = list(indeces_K(l, p))
+        q += 1
+    a = list(indeces_K(l, q, p))
     a = sorted(a, key=lambda e: max(e))
     a = sorted(a, key=lambda e: sum(e))
     return a[:maxn]
@@ -141,6 +142,25 @@ def cheb_diff(x, n):
     return T.basis(n).deriv(1)(x)
 
 
+def herm_nn(x, n):
+    """
+    returns H_n(x)
+    value of non-normalized Probabilistic polynomials
+    $\int exp(-x^2/2)H_m(x)H_n(x) dx = \delta_{nm}$
+    """
+    cf = np.zeros(n+1)
+    cf[n] = 1
+    return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)
+
+def herm_diff_nn(x, n):
+    if n <= 0:
+        return 0
+    cf = np.zeros(n)
+    cf[n-1] = 1
+    return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)
+
+
+
 
 def herm(x, n):
     """
@@ -154,8 +174,6 @@ def herm(x, n):
     nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n)))
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
-
-
 def herm_diff(x, n):
     if n <= 0:
         return 0
@@ -164,9 +182,31 @@ def herm_diff(x, n):
     nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n)))
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)/nc
 
+
+
+def legendre(x, n, interval=(-1.0, 1.0)):
+    """
+    Non-normed poly
+    """
+    xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
+    return L.basis(n)(xn)
+
+def legendre_diff(x, n, interval=(-1.0, 1.0)):
+    xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
+    return L.basis(n).deriv(1)(xn)
+
+def legendre_snorm(n, interval=(-1.0, 1.0)):
+    """
+    RETURNS E[L_n L_n]
+    """
+    # return 2.0/(2.0*n + 1.0)
+    return (interval[1] - interval[0])/(2.0*n + 1.0)
+
+    
+
 # Main func
 
-def GenMat(n_size, x, poly=None, poly_diff=None, debug=False):
+def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1):
     """
     INPUT
         n_size — number of colomns (monoms), int
@@ -192,7 +232,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False):
     if debug:
         print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
 
-    for i, xp in enumerate(indeces_K_cut(l, n_size)):
+    for i, xp in enumerate(indeces_K_cut(l, n_size, p=pow_p)):
         if debug:
             print ('monom #{} is {}'.format(i, xp))
         A[0:n2, i] = herm_mult_many(x, xp, poly)
@@ -264,6 +304,7 @@ def PlotPoints(res, xout, fn='points', display=True):
 
 if __name__ == '__main__':
     print ('Test run')
+    import rect_maxvol
 
     num_p = 4 # number of points we select from on each axis.
     l = 2
