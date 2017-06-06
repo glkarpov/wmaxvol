@@ -1,63 +1,72 @@
-#! /bin/env python
-# -*- coding: utf-8 -*-
-
 import numpy as np
-from maxvolpy.maxvol import maxvol
-from numpy.polynomial import Chebyshev as T
-import numpy.linalg as la
-import matplotlib.pyplot as plt
-#%matplotlib inline
 
-def dets_of_submatrices(Z):
-    y, x = Z.shape
-    det = np.zeros([y/2,x/2])
-    for i in np.arange(0, y, 2):
-        for j in np.arange(0, x, 2):
-            temp_mat = [[Z[k][l] for k in range(i, i+2)] for l in range(j, j+2)]
-            det[i/2, j/2] = np.linalg.det(temp_mat)  
-    det = np.abs(det)        
-    ind = np.argwhere(det.max() == det)
-    a = 2*ind[0,0]
-    b = 2*ind[0,1]
-    return (a, b, np.max(np.abs(det)))
+def SWM(C, deriv, ind_x, ind_j):
+    B = np.copy(C)
+    tmp_columns = np.copy(B[:,ind_j:ind_j + deriv + 1])
+    tmp_columns[ind_j:ind_j + deriv + 1] -= np.eye(deriv + 1)
+    tmp_columns[ind_x:ind_x + deriv + 1] -= np.eye(deriv + 1)
+    
+    b = B[ind_x:ind_x + deriv + 1][:,ind_j:ind_j + deriv + 1]
+    
+    tmp_rows = np.copy(B[ind_x:ind_x + deriv + 1])
+    tmp_rows[:,ind_j:ind_j + deriv + 1] -= np.eye(deriv + 1)
+    
+    B -= np.dot(tmp_columns, np.dot(np.linalg.inv(b),tmp_rows))
+    return B
 
-def block_maxvol(A, tol=1.0, max_iters=100):
+def form_permute(C, j, ind):
+    C[ind],C[j]=C[j],C[ind]
+    return(C)  
+
+def mov_row(C, j, ind_x):
+    temp = np.copy(C[ind_x,:])
+    C[ind_x,:] = C[j, :]
+    C[j, :] = temp            
+            
+
+def block_maxvol(A_init, tol=0.05, max_iters=100, swm_upd = True):
 # work on parameters
-    if tol < 1:
-        tol = 1.0
-    N, r = A.shape
-    
-    #create initial matrix C with I and Z block
-    B = np.copy(A, order='F')
-    B_inv = np.linalg.inv(B[:r])
-    C = np.dot(B, B_inv)
-    #print(C)
-    #initial indexing
-    index = np.arange(N, dtype = np.int32)
-      
-    # find initial block 2x2 with max determinant in C, if it exists
-    i, j, det = dets_of_submatrices(C)
-    #print(det, i, j)
-    # set number of iters to 0
+    ids_init = A_init[:A_init.shape[1]]
+    temp_init = np.dot(A_init,np.linalg.inv(ids_init))
+
+    A = np.copy(A_init)
+    ids = np.copy(ids_init)
+    temp = np.copy(temp_init)
+    n = temp.shape[0]
+    m = temp.shape[1]
+    curr_det = np.abs(np.linalg.det(ids))
+    Fl = True
+    P = np.arange(n)
+    index = np.zeros((2), dtype = int)
     iters = 0
-    
-    while det > tol and iters < max_iters:
-        
-        index[j] = i
-        index[j+1] = i + 1
-        
-        temp = B[i, :]
-        B[i, :] = B[j, :]
-        B[j, :] = temp
-        
-        temp = B[i+1, :]
-        B[i+1, :] = B[j+1, :]
-        B[j+1, :] = temp
-        
-        B_inv = np.linalg.inv(B[:r])
-        C = np.dot(B, B_inv)
-        iters += 1
-        i, j, det = dets_of_submatrices(C)
-        
-    print(index[:r])
-    return index[:r]
+
+    while Fl and (iters < max_iters) :
+        max_det = 0.99
+        for k in range(m,n,2):
+                pair = temp[k:k+2]
+                for j in range(0,m,2):
+                    curr_det = np.abs(np.linalg.det(pair[:,j:j+2]))
+                    if curr_det > max_det :
+                        max_det = curr_det
+                        index[0] = k
+                        index[1] = j
+
+        if (max_det) > (1 + tol):
+            #Forming new permutation array
+            form_permute(P,index[1],index[0])
+            form_permute(P, index[1]+1, index[0]+1)
+
+            ### Recalculating with new rows position
+            if swm_upd == True:
+                bljad = np.copy(temp)
+                temp = SWM(bljad,1,index[0],index[1])
+            else:    
+                mov_row(A,index[1],index[0])
+                mov_row(A,index[1] + 1,index[0] + 1)
+                ids = A[:A.shape[1]]      
+                temp = np.dot(A,np.linalg.inv(ids))           
+
+            iters += 1
+        else:
+            Fl = False 
+    return(A, temp, P)            
