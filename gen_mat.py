@@ -27,6 +27,8 @@ def ReverseIdx(idx):
     """
     returns Reverse permutation
     -1 on unknown places
+    if idx[i] = f
+    then res[f] = i
     """
     n2 = max(idx) + 1
     NumToIdxInv = np.full(n2, -1, dtype=int)
@@ -34,6 +36,28 @@ def ReverseIdx(idx):
         NumToIdxInv[i] = ni
 
     return NumToIdxInv
+
+def sort_like(ar, arn):
+    """
+    RETURNS idx so that
+    ar == arn[idx]
+    """
+    idxr = ReverseIdx(ar)
+    ar_p = [idxr[i] for i in arn]
+    return np.argsort(ar_p)
+
+def change_intersept(inew, iold, full=True):
+    """
+    change two sets of rows or columns when indices may intersept with preserving order
+    RETURN two sets of indices,
+    than say A[idx_n] = A[idx_o]
+    """
+    union = np.array(list( set(inew) | set(iold) ))
+    idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
+    idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
+    return  idx_n, idx_o
+
+
 # @jit('i8(i8,i8)')
 def binom_sh(p,l):
     """
@@ -63,8 +87,12 @@ def indeces_K_cut(l, maxn, p=1):
         print('THIS NEVER HAPPENS!!!\n')
         q += 1
     a = list(indeces_K(l, q, p))
+    # max_pow = long(max(max(i) for i in a))
+    # a = sorted(a, key=lambda e: ''.join(str(i) for i in e), reverse=True)
+    # a = sorted(a, key=lambda e: sum([ ((1L+max_pow)**ni)*i for ni, i in enumerate(e) ]), reverse=True)
+    a = sorted(a, reverse=True)
     a = sorted(a, key=lambda e: max(e))
-    a = sorted(a, key=lambda e: sum(e))
+    a = sorted(a, key=lambda e: np.sum( np.array(e)**p ))
     return a[:maxn]
 
 
