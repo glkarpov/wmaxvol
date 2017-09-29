@@ -11,7 +11,6 @@ from numpy.polynomial.chebyshev import chebval, chebder
 from numpy.polynomial import Chebyshev as T
 from numpy.polynomial import Hermite as H
 from numpy.polynomial import Legendre as L
-from scipy.special.orthogonal import h_roots
 import itertools
 # from scipy.linalg import solve_triangular, get_lapack_funcs, get_blas_funcs
 # import sympy
@@ -22,6 +21,8 @@ import itertools
 # Combinatorials funcs
 
 # norm_cheb = 1.0/np.sqrt(np.pi/2.0)
+sqrt_pi = np.sqrt(np.pi)
+sqrt_pi2 = np.sqrt(np.pi*2)
 
 def ReverseIdx(idx):
     """
@@ -46,13 +47,14 @@ def sort_like(ar, arn):
     ar_p = [idxr[i] for i in arn]
     return np.argsort(ar_p)
 
-def change_intersept(inew, iold, full=True):
+def change_intersept(inew, iold):
     """
-    change two sets of rows or columns when indices may intersept with preserving order
+    change two sets of rows or columns when indices may intercept with preserving order
     RETURN two sets of indices,
     than say A[idx_n] = A[idx_o]
     """
-    union = np.array(list( set(inew) | set(iold) ))
+    # union = np.array(list( set(inew) | set(iold) ))
+    union = np.union1d(inew, iold)
     idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
     idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
     return  idx_n, idx_o
@@ -67,33 +69,64 @@ def binom_sh(p,l):
     """
     return int(  np.math.factorial(p+l)//(np.math.factorial(p)*np.math.factorial(l))  )
 
+def OnesFixed(m, n):
+    """
+    m ones on n places
+    """
+    for i in itertools.combinations_with_replacement(xrange(n), m):
+        uniq = np.unique(i)
+        if len(uniq) == len(i):
+            res = np.full(n, False)
+            res[uniq] = True
+            yield res
+
+
 def indeces_K(l, q, p=1):
     """
-    returns all vectors of length l with sum of indices in power p <= q, starting form 0
-    x^p + y^p <= q
+    returns all vectors of length l with sum of indices in power p <= q^p, starting form 0
+    x^p + y^p <= q^p
+    Elements can repeat!
     """
-    for cmb_u in itertools.combinations_with_replacement(xrange(q+1), l):
-        for cmb in set(itertools.permutations(cmb_u)):
-            if sum(np.array(cmb)**p) <= q:
+    qp = q**p
+    m = int(qp) # max number of non-zero elements
+    if m >= l:
+        # for cmb_u in itertools.combinations_with_replacement(xrange(q+1), l):
+            # for cmb in set(itertools.permutations(cmb_u)):
+        for cmb in itertools.product(xrange(q+1), repeat=l):
+            if sum(np.array(cmb)**p) <= qp:
                 yield cmb
+    else:
+        ones = list(OnesFixed(m, l))
+        for cmb in itertools.product(xrange(q+1), repeat=m): # now m repeat
+            if sum(np.array(cmb)**p) <= qp:
+                for mask in ones:
+                    res = np.zeros(l, dtype=int)
+                    res[mask] = cmb
+                    yield tuple(res)
 
-def indeces_K_cut(l, maxn, p=1):
+
+def indeces_K_cut(l, maxn, p=1, q=1):
     """
     MAGIC FUNCTION
     q is determines automatically
     """
-    q = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
+    # q = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
     while binom_sh(q, l) < maxn:
-        print('THIS NEVER HAPPENS!!!\n')
+        # print('THIS NEVER HAPPENS!!!\n')
         q += 1
-    a = list(indeces_K(l, q, p))
+    # a = list(set(  (tuple(i) for i in  indeces_K(l, q, p)   ) ))
+    a = indeces_K(l, q, p)
     # max_pow = long(max(max(i) for i in a))
     # a = sorted(a, key=lambda e: ''.join(str(i) for i in e), reverse=True)
     # a = sorted(a, key=lambda e: sum([ ((1L+max_pow)**ni)*i for ni, i in enumerate(e) ]), reverse=True)
     a = sorted(a, reverse=True)
+    a = [el for el, _ in itertools.groupby(a)] # delete duplicates
     a = sorted(a, key=lambda e: max(e))
     a = sorted(a, key=lambda e: np.sum( np.array(e)**p ))
-    return a[:maxn]
+    if len(a) < maxn:
+        return indeces_K_cut(l, maxn, p, q+1)
+    else:
+        return a[:maxn]
 
 
 
@@ -169,6 +202,8 @@ def cheb(x, n):
 def cheb_diff(x, n):
     return T.basis(n).deriv(1)(x)
 
+def cheb_snorm(n):
+    return np.pi/2.0 if n != 0 else np.pi
 
 def herm_nn(x, n):
     """
@@ -187,6 +222,12 @@ def herm_diff_nn(x, n):
     cf[n-1] = 1
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)
 
+def herm_snorm(n):
+    """
+    Square norm of "math" Hermite (exp(-x^2/2))
+    """
+    # return (2**n)*np.math.factorial(n)*sqrt_pi
+    return np.math.factorial(n)*sqrt_pi2
 
 
 
@@ -199,7 +240,7 @@ def herm(x, n):
     cf = np.zeros(n+1)
     cf[n] = 1
     #return hermval(x, cf)
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n)))
+    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n))) # norm
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
 def herm_diff(x, n):
@@ -207,8 +248,15 @@ def herm_diff(x, n):
         return 0
     cf = np.zeros(n)
     cf[n-1] = 1
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n)))
+    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n))) # norm
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)/nc
+
+def herm_norm_snorm(n):
+    """
+    For uniform
+    """
+    return 1.0
+
 
 
 
@@ -234,7 +282,7 @@ def legendre_snorm(n, interval=(-1.0, 1.0)):
 
 # Main func
 
-def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1):
+def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True):
     """
     INPUT
         n_size — number of colomns (monoms), int
@@ -255,17 +303,26 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1):
             assert(callable(poly_diff))
             poly_diff = [poly_diff] * l
 
-    nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
+    if ToGenDiff:
+        nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
+    else:
+        nA = n2
     A = np.zeros((nA, n_size))
     if debug:
         print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
 
-    for i, xp in enumerate(indeces_K_cut(l, n_size, p=pow_p)):
+    if indeces is None:
+        indeces = indeces_K_cut(l, n_size, p=pow_p)
+    else:
+        assert(len(indeces) == n_size)
+
+    for i, xp in enumerate(indeces):
         if debug:
             print ('monom #{} is {}'.format(i, xp))
         A[0:n2, i] = herm_mult_many(x, xp, poly)
-        for dl in xrange(1, l+1):
-            A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
+        if ToGenDiff:
+            for dl in xrange(1, l+1):
+                A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
 
     return A
 
@@ -329,9 +386,47 @@ def PlotPoints(res, xout, fn='points', display=True):
     if display:
         plt.show()
 
+def SobolCoeffs(sol, l=2, func_norm=None, indeces=None):
+    """
+    Calculate Sobol' constants
+    """
+
+    if func_norm is None:
+        func_norm = lambda n : legendre_snorm(n, interval=(-1, 1))
+
+    if indeces is None:
+        indeces = list(indeces_K_cut(l, len(sol)))
+
+    def Li(i):
+        resL = []
+        for nj, j in enumerate(indeces):
+            if j[i] > 0 and max(  list(j[:i]) + list(j[i+1:])  ) == 0:
+                resL.append(nj)
+        return resL
+
+    # L_*
+    denom = 0.0
+    for ni, i in enumerate(sol):
+        if ni > 0:
+            # denom += i*i*np.prod(  [legendre_snorm(j, interval=(rngl, rng)) for j in indeces[ni] ] )
+            denom += i*i*np.prod(  [func_norm(j) for j in indeces[ni] ] )
+
+    # L_i
+    res = np.zeros(l, dtype=float)
+    for i in xrange(l):
+        nom = 0.0
+        for j in Li(i):
+            # nom += (sol[j]**2)*np.prod(  [legendre_snorm(k, interval=(rngl, rng)) for k in indeces[j] ] )
+            nom += (sol[j]**2)*np.prod(  [func_norm(k) for k in indeces[j] ] )
+
+        res[i] = nom
+    return res/denom
+
+
 
 if __name__ == '__main__':
     print ('Test run')
+    from scipy.special.orthogonal import h_roots
     import rect_maxvol
 
     num_p = 4 # number of points we select from on each axis.
