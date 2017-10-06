@@ -1,5 +1,13 @@
 import numpy as np
 from maxvolpy.maxvol import maxvol
+from scipy.linalg import lu as lu
+import scipy.linalg 
+
+### how to make from permatation matrix readable array
+def perm_array(A):
+    p_a = np.array((A.shape[0]))
+    p_a = np.argmax(A, axis = 1)
+    return p_a
 
 def perm_matrix(p, m = 'P'):
     p_m = np.zeros((p.shape[0],p.shape[0]),dtype=float)
@@ -12,20 +20,33 @@ def perm_matrix(p, m = 'P'):
         
     return p_m
 
-def pluq_ids(A, debug = False):
-    def mov_permute(C, j, ind):
-        C[ind],C[j]=C[j],C[ind]
-        return()  
+def form_permute(C, j, ind):
+    C[ind],C[j]=C[j],C[ind]
+    return()  
+
+def p_preproc(p,ndim):
+    loc = np.copy(p)
+    for j in range(0,len(loc),ndim):
+        loc[j:j+ndim] = np.sort(loc[j:j+ndim])
+    return(loc)
+
+def change_intersept(inew, iold, full=True):
+    """
+    change two sets of rows or columns when indices may intersept with preserving order
+    RETURN two sets of indices,
+    than say A[idx_n] = A[idx_o]
+    """
+    union = np.array(list( set(inew) | set(iold) ))
+    idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
+    idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
+    return  idx_n, idx_o
+
+def pluq_ids(A, nder = 1, debug = False):
+
     def mov_LU(C, j, ind_r, ind_c, m = 'U'):
         if m == 'U':
-            
-            temp = np.copy(C[ind_r,:])
-            C[ind_r,:] = C[j, :]
-            C[j, :] = temp
-
-            temp = np.copy(C[:,ind_c])
-            C[:, ind_c] = C[:,j]
-            C[:, j] = temp
+            C[[ind_r,j],:] = C[[j,ind_r],:]
+            C[:,[ind_c,j]] = C[:,[j,ind_c]]
         if m=='L':
             temp = np.copy(C[ind_r,:j])
             C[ind_r,:j] = C[j, :j]
@@ -48,25 +69,33 @@ def pluq_ids(A, debug = False):
             U[i,ind:] += L[i,ind]*U[ind,ind:]
         return (U)
     
-    def restore_layer(L,U,ind):
+    def restore_layer(L,U,ind, ndim):
         k = L.shape[0]
-        down_ind = ind + 1
-        for i in range(down_ind+1, k):
-            U[i,down_ind:] += L[i,down_ind]*U[down_ind,down_ind:]
-        for i in range(ind+1, k):
-            U[i,ind:] += L[i,ind]*U[ind,ind:]    
+        for j in range(ndim-1,ind-1, -1):
+            for i in range(j+1, k):
+                U[i,ind:] += L[i,ind]*U[ind,ind:]    
         return (U)
     
     def det_search(A,start_ind1, start_ind2):
         det = 0.0
         row = start_ind1 
-        for k in range(start_ind1,A.shape[0],2):
+
+        for k in range(start_ind1,A.shape[0],ndim):
             if k not in black_list:
-                pair = A[k:k+2][:,start_ind2:].T
-                if np.linalg.matrix_rank(pair) == 2 :
+                pair = A[k:k+ndim][:,start_ind2:].T
+                #print pair, np.linalg.matrix_rank(pair)
+                _,y,_ = scipy.linalg.svd(pair)
+                ra = 0
+                #print y
+                for t in range(0,len(y)):
+                    if np.abs(y[t]) > 1e-20:
+                        #print ra
+                        ra = ra + 1
+                if ra == ndim :
                     piv,_ = maxvol(pair)
                     if np.abs(np.linalg.det(pair[piv])) > det:
                         det, row = np.abs(np.linalg.det(pair[piv])), k
+                
         return(det, row)        
                 
     n, m = A.shape[0], A.shape[1]
@@ -74,7 +103,7 @@ def pluq_ids(A, debug = False):
     L = np.eye(n, m, dtype=float)
     U = np.copy(A)
     Q = np.arange(m)
-    yx = np.array([0, 0], dtype=int)
+    ndim = nder + 1
     black_list = []
     info = np.zeros((2), dtype=int)
     treshold = 1e-10
@@ -82,126 +111,91 @@ def pluq_ids(A, debug = False):
     while (j < m):
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
         ### 'k'- pair counter, which starts from current j position till the bottom of the matrix
-        
         max_det, row_n = det_search(U,j,j)
         if (max_det == 0.0) and (j == 0):
             ### Critical error = no appropriate pair
             info[0] = 1
             return (P,L,U,Q,info)            
         if max_det == 0.0:
-            if debug:
+            if debug == True:
                 print('error found')
             info[1] += 1
-            j = j - 2
-            restore_layer(L,U,j)
+            j = j - ndim
+            restore_layer(L,U,j,ndim)
             if debug:
             	print ('restored matrix')
             	print (U)
-            max_det, row_n = det_search(U,j+2,j)
+            max_det, row_n = det_search(U,j+ndim,j)
             if max_det == 0.0:
                 # Critical error = all elements are in blacklist
                 info[0] = 1
-                return (P,L,U,Q,info)
-                
+                return (P,L,U,Q,info)                
             black_list.append(row_n)
-        pair = U[row_n:row_n +2][:,j:].T
-        piv,_ = maxvol(pair)
-        piv.sort() 
-        
-        diag = False
-        if (np.abs(pair[piv][0,0]) < treshold) or (np.abs(pair[piv][1,1]) < treshold):
-            yx[0] = row_n 
-            yx[1] = piv[1]+ j
-            diag = True
-            if debug:
-                print ('diag case')
-                print (pair[piv])
-        else:
-        
-            yx[0] = row_n
-            yx[1] = piv[0]+ j 
-            
+        loc_point = np.rot90(U[row_n:row_n + ndim][:,j:],1,(1,0))
+        piv,_ = maxvol(loc_point)
+        piv.sort()
+         
         if (debug):
-            if np.linalg.det(pair[piv]) == max_det:
-                print('correct 2x2 matrix')
-              
             print ('on the', j, 'slice')
-            print ('best row block is', row_n, row_n + 1)
-            print ('column coordinates:', piv[0] + j, piv[1] + j)
-            print ('maxvol 2x2 submatrix', pair[piv])
+            print ('best row block is', np.arange(ndim) + row_n)
+            print ('column coordinates:', piv + j)
+            print ('maxvol 2x2 submatrix', np.rot90(loc_point[piv],1,(0,1)))
             print ('with det = ', max_det)
             print ('pivoting and permutations start...')
-            
-            
-        ### U moving ###
-        mov_LU(U,j,yx[0],yx[1])
-        ####
 
-        ### L moving ###
-        mov_LU(L,j,yx[0],yx[1],m='L')
-        ###
-        
-        ### P&Q moving ###
-        mov_permute(P,j,yx[0])
-        mov_permute(Q,j,yx[1])
-        
-     
-        if (debug):
-            print ('after 1st pivot')
-            print (U)
+        print piv + j,np.arange(ndim) + j
+        indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
+        U[:,indx_n] = U[:,indx_o]
+        L[:j,indx_n] = L[:j,indx_o]           
+        Q[indx_n] = Q[indx_o]
+                   
+      
+        #print Q
+        indx_n, indx_o = change_intersept(np.arange(ndim) + j,row_n + np.arange(ndim))
                 
-        #choosing second element to pivot. 
-        ### if true, it means we do not have to permute COLUMNS (but still have to permute rows) another one time, because it will return to the initial condition 
-        if (0,1) == (piv[0],piv[1]):
-            yx[0] = row_n + 1
-            ### U moving ###
-            mov_LU(U,j+1,yx[0],j+1)
-            ####
-            if (debug):
-                print ('piv-neighbours case, after 2nd pivot, ')
-                print U
-            ### L moving ###
-            mov_LU(L,j+1,yx[0],j+1,m='L')
-            ###
-
-            ### P&Q moving ###
-            mov_permute(P,j+1,yx[0])  
-
-        else:
-            if (diag == True) and (piv[0] != 0):                    
-                yx[0] = row_n + 1
-                yx[1] = piv[0]+ j 
-                if debug:
-                    print ('diag case')
-            else:
-                yx[0] = row_n + 1
-                yx[1] = piv[1]+ j                 
-            
-            ### U moving ###
-            mov_LU(U,j+1,yx[0],yx[1])
-            ####
-            if (debug):
-                print ('after 2nd pivot')
-                print U
-            ### L moving ###
-            mov_LU(L,j+1,yx[0],yx[1],m='L')
-            ###
-
-            ### P&Q moving ###
-            mov_permute(P,j+1,yx[0])
-            mov_permute(Q,j+1,yx[1])
+        U[indx_n,:] = U[indx_o,:]
+        L[indx_n,:j] = L[indx_o,:j]           
+        P[indx_n] = P[indx_o]
+        #print('rows swapped')
+        #print P
+        block = np.copy(U[j:j+ndim,j:j+ndim])
+        print block
+        if (debug):
+            if np.linalg.det(block) == max_det:
+                print('correct 2x2 matrix')
+        p_loc,l,rt = lu(block)
+        print p_loc.T
+        #print la.det(rt)
+        p_loc  = perm_array(p_loc.T)
+        print ('p_locs')
+        print p_loc,np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc]
+        indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
+        #print indx_n,indx_o
+        #aab = np.concatenate((indx_n,indx_o))
+        #bba = np.concatenate((indx_o,indx_n))
+        #print aab,bba
         
+        U[indx_n,:] = U[indx_o,:]
+        L[indx_n,:j] = L[indx_o,:j]
+        P[indx_n] = P[indx_o]
+        print ('after local perms')
+        print U[j:j+ndim]   
+        #print P[j:j+ndim]
+        
+        if debug == True:
+            print ('just before elim')
+            print U
         if (debug):
             print('Elimination starts')
         ### make them all zeros! Below (j,j) element
-        elimination(L,U,j)
+        for idx in range(ndim):                      
+            elimination(L,U,j + idx)
         if (debug):
-            print('after 1st elimination')
+            print('after {} eliminations'.format(ndim))
             print U
-        elimination(L,U,j+1)
-        j = j + 2
-        if (debug):
-            print('after 2nd elimination')
-            print U
-        
+
+        j = j + ndim
+        #print np.linalg.matrix_rank(U)
+      
+
     return(P,L,U,Q,info)  
