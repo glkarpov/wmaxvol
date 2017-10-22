@@ -42,19 +42,6 @@ def change_intersept(inew, iold, full=True):
     return  idx_n, idx_o
 
 def pluq_ids(A, nder = 1, debug = False):
-
-    def mov_LU(C, j, ind_r, ind_c, m = 'U'):
-        if m == 'U':
-            C[[ind_r,j],:] = C[[j,ind_r],:]
-            C[:,[ind_c,j]] = C[:,[j,ind_c]]
-        if m=='L':
-            temp = np.copy(C[ind_r,:j])
-            C[ind_r,:j] = C[j, :j]
-            C[j, :j] = temp
-
-            temp = np.copy(C[:j,ind_c])
-            C[:j, ind_c] = C[:j,j]
-            C[:j, j] = temp  
             
     def elimination(L,U,ind):
         k = L.shape[0]
@@ -71,9 +58,9 @@ def pluq_ids(A, nder = 1, debug = False):
     
     def restore_layer(L,U,ind, ndim):
         k = L.shape[0]
-        for j in range(ndim-1,ind-1, -1):
+        for j in range(ndim + ind-1,ind-1, -1):
             for i in range(j+1, k):
-                U[i,ind:] += L[i,ind]*U[ind,ind:]    
+                U[i,j:] += L[i,j]*U[j,j:]    
         return (U)
     
     def det_search(A,start_ind1, start_ind2):
@@ -82,15 +69,10 @@ def pluq_ids(A, nder = 1, debug = False):
 
         for k in range(start_ind1,A.shape[0],ndim):
             if k not in black_list:
-                pair = A[k:k+ndim][:,start_ind2:].T
-                #print pair, np.linalg.matrix_rank(pair)
-                _,y,_ = scipy.linalg.svd(pair)
-                ra = 0
-                #print y
-                for t in range(0,len(y)):
-                    if np.abs(y[t]) > 1e-20:
-                        #print ra
-                        ra = ra + 1
+                #pair = A[k:k+ndim][:,start_ind2:].T
+                pair = np.rot90(A[k:k + ndim][:,start_ind2:],1,(1,0))
+                ra = np.linalg.matrix_rank(pair)
+
                 if ra == ndim :
                     piv,_ = maxvol(pair)
                     if np.abs(np.linalg.det(pair[piv])) > det:
@@ -104,6 +86,8 @@ def pluq_ids(A, nder = 1, debug = False):
     U = np.copy(A)
     Q = np.arange(m)
     ndim = nder + 1
+    global unit
+    yx = np.array([0, 0], dtype=int)
     black_list = []
     info = np.zeros((2), dtype=int)
     treshold = 1e-10
@@ -143,45 +127,38 @@ def pluq_ids(A, nder = 1, debug = False):
             print ('with det = ', max_det)
             print ('pivoting and permutations start...')
 
-        print piv + j,np.arange(ndim) + j
+        #print piv + j,np.arange(ndim) + j
         indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
         U[:,indx_n] = U[:,indx_o]
         L[:j,indx_n] = L[:j,indx_o]           
         Q[indx_n] = Q[indx_o]
-                   
-      
-        #print Q
+
         indx_n, indx_o = change_intersept(np.arange(ndim) + j,row_n + np.arange(ndim))
                 
         U[indx_n,:] = U[indx_o,:]
         L[indx_n,:j] = L[indx_o,:j]           
         P[indx_n] = P[indx_o]
-        #print('rows swapped')
-        #print P
+
         block = np.copy(U[j:j+ndim,j:j+ndim])
-        print block
+        #print block
         if (debug):
             if np.linalg.det(block) == max_det:
                 print('correct 2x2 matrix')
         p_loc,l,rt = lu(block)
-        print p_loc.T
-        #print la.det(rt)
+
         p_loc  = perm_array(p_loc.T)
-        print ('p_locs')
-        print p_loc,np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc]
+
+        #print p_loc,np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc]
         indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
-        #print indx_n,indx_o
-        #aab = np.concatenate((indx_n,indx_o))
-        #bba = np.concatenate((indx_o,indx_n))
-        #print aab,bba
         
         U[indx_n,:] = U[indx_o,:]
         L[indx_n,:j] = L[indx_o,:j]
         P[indx_n] = P[indx_o]
-        print ('after local perms')
-        print U[j:j+ndim]   
-        #print P[j:j+ndim]
+        #print ('after local perms')
+        #print U[j:j+ndim]   
+
         
+
         if debug == True:
             print ('just before elim')
             print U
@@ -195,7 +172,7 @@ def pluq_ids(A, nder = 1, debug = False):
             print U
 
         j = j + ndim
-        #print np.linalg.matrix_rank(U)
-      
 
-    return(P,L,U,Q,info)  
+      
+    P_pr = p_preproc(P, ndim)
+    return(P_pr,L,U,Q,info)  

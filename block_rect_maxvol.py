@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.linalg as la
-
+import ids
+from block_maxvol import *
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
 class lining:
     def __init__(self, A, U,inv = False):
@@ -33,11 +34,20 @@ def form_permute(C, j, ind):
 def mov_row(C, j, ind_x):
     C[[ind_x,j],:] = C[[j,ind_x],:]
     
-def rect_block_maxvol(A_init, nder, M, t = 0.05):
+def cold_start(C, ndim):
+    k = C.shape[0] // ndim
+    n = C.shape[0]
+    values = []
+    for i in range(0,k):
+        CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].T)
+        values.append((CC_T))
+    return values      
+    
+def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     ndim = nder + 1
-    K,n = A_init.shape[0], A_init.shape[1]
-    block_n = K // ndim # Whole amount of blocks in matrix A
-    P = np.arange(K) # Permutation vector
+    M,n = A_init.shape[0], A_init.shape[1]
+    block_n = M // ndim # Whole amount of blocks in matrix A
+    P = np.arange(M) # Permutation vector
     Fl = True
     Fl_cs = True
     ids_init = A_init[:n]
@@ -50,7 +60,7 @@ def rect_block_maxvol(A_init, nder, M, t = 0.05):
     shape_index = n
     C_w = np.copy(C)
     
-    while Fl and (shape_index != M):
+    while Fl and (shape_index != Kmax):
         
         if Fl_cs:
             CC_sigma = cold_start(C_w, ndim)
@@ -76,14 +86,14 @@ def rect_block_maxvol(A_init, nder, M, t = 0.05):
             
         ind_array = la.det(np.eye(ndim) + CC_sigma)
         elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
-        print elem
+        #print elem
         if (ind_array[elem] > 1 + t):
             CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
             for idx in range(ndim):                          
                 form_permute(P,shape_index + idx,elem*ndim + idx)
                 mov_row(C,shape_index + idx,elem*ndim + idx)
             C_new, line = rect_core(C_w,C_w[shape_index:shape_index + ndim],ndim)
-            print C_new.shape, C_w.shape
+            #print C_new.shape, C_w.shape
             
             ### update list of CC_sigma
             for k in range(block_n):
@@ -95,3 +105,17 @@ def rect_block_maxvol(A_init, nder, M, t = 0.05):
             Fl = False
             
         return(C_w, CC_sigma, P)     
+    
+def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
+    pluq_perm,l,u,q,inf = ids.pluq_ids(A,nder, debug=False)
+    A_init = np.dot(ids.perm_matrix(pluq_perm),np.dot(A,ids.perm_matrix(q)))
+    A_rect_init,_,perm = block_maxvol(A_init, nder, tol = tol,max_iters=200,swm_upd=True)
+    bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm),ids.perm_matrix(pluq_perm)))
+    a, b, c = rect_block_maxvol_core(A_rect_init,nder,Kmax,t = rect_tol)
+    final_perm = ids.perm_array(np.dot(ids.perm_matrix(c),ids.perm_matrix(bm_perm)))
+    
+    if ext_debug:
+        return (a,b, final_perm, bm_perm, pluq_perm)
+    else:
+        return (final_perm)
+        
