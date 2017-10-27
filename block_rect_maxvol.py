@@ -60,8 +60,29 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     shape_index = n
     C_w = np.copy(C)
     
-    while Fl and (shape_index != Kmax):
-        
+    while (Fl == True) and (shape_index < Kmax):
+            
+        if (Fl_cs == False):
+            ind_array = la.det(np.eye(ndim) + CC_sigma)
+            elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
+            print elem
+            if (ind_array[elem] > 1 + t):
+                CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
+                for idx in range(ndim):                          
+                    form_permute(P,shape_index + idx,elem*ndim + idx)
+                    mov_row(C_w,shape_index + idx,elem*ndim + idx)
+                C_new, line = rect_core(C_w,C_w[shape_index:shape_index + ndim],ndim)
+                #print C_new.shape, C_w.shape
+
+                ### update list of CC_sigma
+                for k in range(block_n):
+                    CC_sigma[k] = CC_sigma[k] - lining(C_w[k*ndim:ndim*(k+1)],line,inv=True).assemble()
+                C_w = C_new     
+                shape_index += ndim
+            else:
+                print ('elements not found')
+                Fl = False
+                
         if Fl_cs:
             CC_sigma = cold_start(C_w, ndim)
             ind_array = la.det(np.eye(ndim) + CC_sigma)
@@ -71,7 +92,7 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
                 CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
                 for idx in range(ndim):                          
                     form_permute(P,shape_index + idx,elem*ndim + idx)
-                    mov_row(C,shape_index + idx,elem*ndim + idx)
+                    mov_row(C_w,shape_index + idx,elem*ndim + idx)
             else:
                 print ('cold_start fail')
                 Fl = False
@@ -82,29 +103,9 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
             for k in range(block_n):
                 CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].T))
             C_w = C_new 
-            Fl_cs = False
-            
-        ind_array = la.det(np.eye(ndim) + CC_sigma)
-        elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
-        #print elem
-        if (ind_array[elem] > 1 + t):
-            CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
-            for idx in range(ndim):                          
-                form_permute(P,shape_index + idx,elem*ndim + idx)
-                mov_row(C,shape_index + idx,elem*ndim + idx)
-            C_new, line = rect_core(C_w,C_w[shape_index:shape_index + ndim],ndim)
-            #print C_new.shape, C_w.shape
-            
-            ### update list of CC_sigma
-            for k in range(block_n):
-                CC_sigma[k] = CC_sigma[k] - lining(C_w[k*ndim:ndim*(k+1)],line,inv=True).assemble()
-            C_w = C_new     
-            shape_index += ndim
-        else:
-            print ('elements not found')
-            Fl = False
-            
-        return(C_w, CC_sigma, P)     
+            Fl_cs = False        
+
+    return(C_w, CC_sigma, P)     
     
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
     pluq_perm,l,u,q,inf = ids.pluq_ids(A,nder, debug=False)
