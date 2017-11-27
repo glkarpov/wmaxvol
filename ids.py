@@ -10,7 +10,7 @@ def perm_array(A):
     return p_a
 
 def perm_matrix(p, m = 'P'):
-    p_m = np.zeros((p.shape[0],p.shape[0]),dtype=float)
+    p_m = np.zeros((p.shape[0], p.shape[0]),  dtype=p.dtype) # Check type!!!!!
     if m == 'P':
         for i in range(0,p.shape[0]):     
             p_m[i,p[i]] = 1.0
@@ -82,7 +82,7 @@ def pluq_ids(A, nder = 1, debug = False):
                 
     n, m = A.shape[0], A.shape[1]
     P = np.arange(n)
-    L = np.eye(n, m, dtype=float)
+    L = np.eye(n, m, dtype=A.dtype)
     U = np.copy(A)
     Q = np.arange(m)
     ndim = nder + 1
