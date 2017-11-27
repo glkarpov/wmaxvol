@@ -59,6 +59,7 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     
     shape_index = n
     C_w = np.copy(C)
+    CC_sigma = []
     
     while (Fl == True) and (shape_index < Kmax):
             
