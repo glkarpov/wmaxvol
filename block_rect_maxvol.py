@@ -6,12 +6,12 @@ from block_maxvol import *
 class lining:
     def __init__(self, A, U,inv = False):
         if inv == False:
-            self.left = A.T
+            self.left = A.conjugate().T
             self.right = A
             self.core = U
         else:
             self.left = A
-            self.right = A.T
+            self.right = A.conjugate().T
             self.core = U
     def left_prod(self):
         return np.dot(self.left, self.core)
@@ -22,7 +22,7 @@ class lining:
 
 # main func to form new coeff matrix    
 def rect_core(C, C_sigma, ndim):
-    inv_block = la.inv(np.eye(ndim) + np.dot(C_sigma, C_sigma.T))
+    inv_block = la.inv(np.eye(ndim) + np.dot(C_sigma, C_sigma.conjugate().T))
     puzzle = lining(C_sigma,inv_block)
     U = np.hstack((np.eye(C.shape[1]) - puzzle.assemble(), puzzle.left_prod()))
     C_new = lining(C,U,inv = True).left_prod()
@@ -39,7 +39,7 @@ def cold_start(C, ndim):
     n = C.shape[0]
     values = []
     for i in range(0,k):
-        CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].T)
+        CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].conjugate().T)
         values.append((CC_T))
     return values      
     
@@ -102,9 +102,10 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
             
             ### update list of CC_sigma
             for k in range(block_n):
-                CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].T))
+                CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].conjugate().T))
             C_w = C_new 
-            Fl_cs = False        
+            Fl_cs = False      
+            
 
     return(C_w, CC_sigma, P)     
     
