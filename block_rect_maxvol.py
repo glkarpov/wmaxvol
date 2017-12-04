@@ -110,6 +110,10 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     return(C_w, CC_sigma, P)     
     
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
+    assert (A.shape[1] % (nder+1) == 0)
+    assert (A.shape[0] % (nder+1) == 0)
+    assert (Kmax % (nder+1) == 0)
+    assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
     pluq_perm,l,u,q,inf = ids.pluq_ids(A,nder, debug=False)
     A_init = np.dot(ids.perm_matrix(pluq_perm),np.dot(A,ids.perm_matrix(q)))
     A_rect_init,_,perm = block_maxvol(A_init, nder, tol = tol,max_iters=200,swm_upd=True)
