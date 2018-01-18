@@ -17,6 +17,7 @@ import itertools
 # from sympy import *
 # %matplotlib inline
 
+xrange = range
 
 # Combinatorials funcs
 
