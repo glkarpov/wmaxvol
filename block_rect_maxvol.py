@@ -41,7 +41,17 @@ def cold_start(C, ndim):
     for i in range(0,k):
         CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].conjugate().T)
         values.append((CC_T))
-    return values      
+    return values    
+
+### returns 2 values - function on domain, and block structured
+def rhs(points, nder, mode = 'gauss'):
+    block_rhs = np.zeros((nder+1)*(points.shape[0]))
+    func = 2*np.exp(-((points[:,0]**2)/2. + (points[:,1]**2)/2.))# + (points[:,2]**2)/2.)) # Gaussian
+    for i in range(points.shape[0]):
+        block_rhs[i*(nder+1)] = func[i]
+        for j in range(nder):
+            block_rhs[i*(nder+1)+j+1] = -1*(points[i,j])*func[i]
+    return func, block_rhs   
     
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     ndim = nder + 1
@@ -126,3 +136,6 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     else:
         return (final_perm)
         
+def err_estim(x_test, A_test, c_block, nder):
+    error = la.norm(rhs(x_test,nder)[0] - np.dot(A_test, c_block), np.inf) / la.norm(rhs(x_test,nder)[0], np.inf)
+    return (error)
