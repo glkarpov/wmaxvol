@@ -1,8 +1,6 @@
 #! /bin/env python
 # -*- coding: utf-8 -*-
 
-# import ahkab
-# from ahkab import circuit, printing, time_functions, dc_analysis, utilities, dc_guess, devices, ekv, transient
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
@@ -15,7 +13,6 @@ import itertools
 # from scipy.linalg import solve_triangular, get_lapack_funcs, get_blas_funcs
 # import sympy
 # from sympy import *
-# %matplotlib inline
 
 xrange = range
 
@@ -257,6 +254,30 @@ def herm_norm_snorm(n):
     For uniform
     """
     return 1.0
+
+
+def trigpoly(xin, n, interval=(-1,1)):
+    """
+    return sin(n x) or cos(n x)
+    """
+    if n==0:
+        return 1.0
+
+    x = np.pi*(interval[0] + interval[1] - 2.0*xin)/(interval[0] - interval[1]) # map interval to [-pi, pi]
+    func = np.cos if n % 2 else np.sin
+    tpow = (n+1) // 2
+
+    return func(tpow*x)
+
+def trigpoly_diff(xin, n, interval=(-1,1)):
+    if n==0:
+        return 0.0
+
+    x = np.pi*(interval[0] + interval[1] - 2.0*xin)/(interval[0] - interval[1]) # map interval to [-pi, pi]
+    func = (lambda x: -np.sin(x)) if n % 2 else np.cos
+    tpow = (n+1) // 2
+
+    return tpow*func(tpow*x)
 
 
 
