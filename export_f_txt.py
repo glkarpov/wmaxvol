@@ -122,6 +122,8 @@ def FindDiff(f, d, i=1, ret_symb=False):
         ret_symb -- whether to return symbolic representation along with func
     """
     vars_f = symbols(' '.join(['x' + str(i1) for i1 in xrange(d)]))
+    if d==1:
+        vars_f = (vars_f, ) # In the case of one variable vars_f is not a tuple, but should be
     fd = diff(f(*vars_f), vars_f[i-1])
     fout, _ = symb_to_func(fd, d, False)
     if ret_symb:

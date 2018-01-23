@@ -177,7 +177,7 @@ def herm_mult_many_diff(x, xi, diff_var, poly_func=None, poly_diff=None):
         poly_func = [herm] * l
         poly_diff = [herm_diff] * l
 
-    res = np.ones(N)
+    res = np.ones(N, dtype=x.dtype)
     for n in xrange(l):
         if n == diff_var:
             res *= poly_diff[n](x[:, n], xi[n])
@@ -329,7 +329,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
     else:
         nA = n2
-    A = np.zeros((nA, n_size))
+    A = np.zeros((nA, n_size), dtype=x.dtype)
     if debug:
         print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
 
