@@ -6,6 +6,13 @@ from sympy import *
 
 ### Main fucns
 
+def SymbVars(l, name='x'):
+    return symbols(StrVars(l, name=name, last_comma=True))
+
+def StrVars(l, name='x', delim=',', last_comma=False, add_on = ''):
+    lst = ',' if last_comma else '' # last ",", gives tuple anywhere, including l==1
+    return delim.join([name + str(i) + add_on for i in xrange(l)]) + lst
+
 def export_f_txt(func, l):
     """
     Export sympy object as string
@@ -13,7 +20,8 @@ def export_f_txt(func, l):
         func -- sympy object
         l    -- number of vars
     """
-    vars_f = symbols(' '.join(['x' + str(i) for i in xrange(l)]))
+    # vars_f = symbols(' '.join(['x' + str(i) for i in xrange(l)]))
+    vars_f = SymbVars(l)
     return str(simplify(func(*vars_f)))
 
 def export_f_Math(func, l, func_name='F'):
@@ -21,7 +29,8 @@ def export_f_Math(func, l, func_name='F'):
     Export sympy object as Mathematica function
     """
     ans = export_f_txt(func, l)
-    vars_f = ', '.join(['x' + str(i) + '_' for i in xrange(l)])
+    # vars_f = ', '.join(['x' + str(i) + '_' for i in xrange(l)])
+    vars_f = StrVars(l, delim=', ', add_on = '_')
     return "{}[{}]:={}".format(func_name, vars_f, ans)
 
 def symb_to_func_old(func, l, is_func=True):
@@ -41,7 +50,8 @@ def symb_to_func_old(func, l, is_func=True):
     for i in ['exp','cos', 'sin']:
         ans = ans.replace(i + '(', 'np.' + i +'(')
 
-    vars_f = ', '.join(['x' + str(i) for i in xrange(l)])
+    # vars_f = ', '.join(['x' + str(i) for i in xrange(l)])
+    vars_f = StrVars(l, delim=', ')
     return eval("lambda  " + vars_f + " :  " + ans  ), ans
 
 def symb_to_func(func, l, is_func=True):
@@ -53,7 +63,8 @@ def symb_to_func(func, l, is_func=True):
     RETURNS 
         lambda - func from sympy obj
     """
-    vars_f = symbols(   ', '.join([ 'x' + str(i) for i in xrange(l) ])  )
+    # vars_f = symbols(   ', '.join([ 'x' + str(i) for i in xrange(l) ])  )
+    vars_f = SymbVars(l)
     if is_func:
         return utilities.lambdify(vars_f, func(*vars_f), 'numpy'), export_f_txt(func, l)
     else:
@@ -121,15 +132,14 @@ def FindDiff(f, d, i=1, ret_symb=False):
         i -- diff the func w.r.t. ith arg, i<=d
         ret_symb -- whether to return symbolic representation along with func
     """
-    vars_f = symbols(' '.join(['x' + str(i1) for i1 in xrange(d)]))
-    if d==1:
-        vars_f = (vars_f, ) # In the case of one variable vars_f is not a tuple, but should be
+    vars_f = SymbVars(d)
     fd = diff(f(*vars_f), vars_f[i-1])
     fout, _ = symb_to_func(fd, d, False)
     if ret_symb:
         return fout, fd
     else:
         return fout
+
 
 if __name__ == '__main__':
     print 'Test run'
@@ -170,6 +180,26 @@ if __name__ == '__main__':
     yp_diff = fdiff(xp, 0)
 
     plt.plot(xp, yp, xp, yp_diff)
-    plt.show()
+    # plt.show()
 
+
+    # Math functions form numpy ans sympy
+    print "-"*70
+
+    def f_sin(x):
+        return sin(x) # Actually, its sympy.sin
+
+
+    f_sin_l, _ = symb_to_func(f_sin, 1) # Make real (numpy) func from sympy objects
+
+    f_diff, f_diff_symb = FindDiff(f_sin, 1, 1, True) # U can pass either f_sin or f_sin_l here
+    print "Diff of func with sin:", f_diff_symb
+
+    fig = plt.figure()
+    xp = np.linspace(-np.pi, np.pi, 1000)
+    yp = f_sin_l(xp) # U can use only f_sin_l here, not f_sin!!!
+    yp_diff = f_diff(xp)
+
+    plt.plot(xp, yp, xp, yp_diff)
+    plt.show()
 
