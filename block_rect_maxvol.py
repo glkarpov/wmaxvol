@@ -2,6 +2,10 @@ import numpy as np
 import numpy.linalg as la
 import ids
 from block_maxvol import *
+from gen_mat import *
+from sympy import *
+from export_f_txt import FindDiff, symb_to_func
+
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
 class lining:
     def __init__(self, A, U,inv = False):
@@ -42,17 +46,15 @@ def cold_start(C, ndim):
         CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].conjugate().T)
         values.append((CC_T))
     return values    
-
-### returns 2 values - function on domain, and block structured
-def rhs(points, nder, mode = 'gauss'):
-    block_rhs = np.zeros((nder+1)*(points.shape[0]))
-    func = 2*np.exp(-((points[:,0]**2)/2. + (points[:,1]**2)/2.))# + (points[:,2]**2)/2.)) # Gaussian
-    for i in range(points.shape[0]):
-        block_rhs[i*(nder+1)] = func[i]
-        for j in range(nder):
-            block_rhs[i*(nder+1)+j+1] = -1*(points[i,j])*func[i]
-    return func, block_rhs   
     
+def matrix_prep(A, ndim, l):
+    n,m = A.shape[0],A.shape[1]
+    B = np.zeros((n,m),dtype=float)
+    for j in range(0,l):
+        block = j * ndim
+        B[block + np.arange(ndim),:] = A[l * np.arange(ndim) + j,:]
+    return (B) 
+
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     ndim = nder + 1
     M,n = A_init.shape[0], A_init.shape[1]
@@ -135,7 +137,52 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
         return (a,b, final_perm, bm_perm, pluq_perm)
     else:
         return (final_perm)
-        
-def err_estim(x_test, A_test, c_block, nder):
-    error = la.norm(rhs(x_test,nder)[0] - np.dot(A_test, c_block), np.inf) / la.norm(rhs(x_test,nder)[0], np.inf)
+
+def test(M,x, nder, col_expansion, N_rows, function = 'default'):
+    N_column = col_expansion*(nder+1)
+    print la.matrix_rank(M)
+    print N_column
+    assert la.matrix_rank(M) == N_column
+    assert la.matrix_rank(M[:N_column]) < N_column
+    
+    piv = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
+    cut_piv = piv[:N_rows]
+    
+    func, block_func_deriv = rhs(x,nder)
+    c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
+    
+    taken_p = x[cut_piv[::(nder+1)]/(nder+1),:]
+    
+    l_bound = interval[0]
+    u_bound = interval[1]
+    plt.xlim(l_bound-0.15, u_bound+0.15)
+    plt.ylim(l_bound-0.15, u_bound+0.15)
+    plt.plot(taken_p[:,0],taken_p[:,1], 'b^', label = "BMV")
+    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, borderaxespad=0.)
+    plt.figtext(.8, .8, "E = {}".format(error))
+    plt.grid(True)
+    fn = 'd={}_num={}_nder={}.pdf'.format(N_column, N_rows, nder)
+    plt.savefig(fn)
+    
+def approximant(nder, coef):
+    components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
+    sym_monoms = GenMat(coef.shape[0], np.array([components]),poly=cheb, debug=False,pow_p=1,ToGenDiff=False)
+    evaluate = np.dot(sym_monoms[0], coef)
+    evaluate = simplify(evaluate)
+    res = utilities.lambdify(components, evaluate, 'numpy')
+    return (res)    
+     
+def error_est(origin_func, approx, points):
+    error = la.norm(origin_func(*points.T) - approx(*points.T),np.inf) / la.norm(origin_func(*points.T), np.inf)
     return (error)
+
+
+### returns 2 values - function on domain, and block structured
+def gauss_sp(x,y):
+    func = 2*exp(-((x**2)/2. + (y**2)/2.))
+    return func
+
+gauss, _ = symb_to_func(gauss_sp, 2)
+
+gauss.diff = (FindDiff(gauss_sp, 2, i, False) for i in range(2))
+
