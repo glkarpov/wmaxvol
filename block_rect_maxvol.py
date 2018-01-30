@@ -5,6 +5,7 @@ from block_maxvol import *
 from gen_mat import *
 from sympy import *
 from export_f_txt import FindDiff, symb_to_func
+from pyDOE import *
 
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
 class lining:
@@ -138,31 +139,33 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     else:
         return (final_perm)
 
-def test(M,x, nder, col_expansion, N_rows, function = 'default'):
+def test(A,x,x_test, nder, col_expansion, N_rows, function):
     N_column = col_expansion*(nder+1)
-    print la.matrix_rank(M)
-    print N_column
-    assert la.matrix_rank(M) == N_column
-    assert la.matrix_rank(M[:N_column]) < N_column
+    M = A[:, :N_column]
+    #print la.matrix_rank(M)
+    #print N_column
     
     piv = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
     cut_piv = piv[:N_rows]
     
-    func, block_func_deriv = rhs(x,nder)
+    block_func_deriv = RHS(function,nder,x)
     c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
     
     taken_p = x[cut_piv[::(nder+1)]/(nder+1),:]
+    approx_calcul = approximant(nder,c_block)
+    error = error_est(function, approx_calcul, x_test)
     
-    l_bound = interval[0]
-    u_bound = interval[1]
+    l_bound = np.amin(x)
+    u_bound = np.amax(x)
     plt.xlim(l_bound-0.15, u_bound+0.15)
     plt.ylim(l_bound-0.15, u_bound+0.15)
     plt.plot(taken_p[:,0],taken_p[:,1], 'b^', label = "BMV")
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, borderaxespad=0.)
     plt.figtext(.8, .8, "E = {}".format(error))
     plt.grid(True)
-    fn = 'd={}_num={}_nder={}.pdf'.format(N_column, N_rows, nder)
+    fn = 'func={}_d={}_num={}_nder={}.pdf'.format(function.__name__, N_column, N_rows, nder)
     plt.savefig(fn)
+    return (error)
     
 def approximant(nder, coef):
     components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
@@ -171,18 +174,48 @@ def approximant(nder, coef):
     evaluate = simplify(evaluate)
     res = utilities.lambdify(components, evaluate, 'numpy')
     return (res)    
+
+def test_points_gen(n_test, nder, distrib = 'random'):
+    if distrib == 'random' :
+        x_test = 2*np.random.rand(n_test,nder) - 1
+    if distrib == 'LHS' :
+        x_test = lhs(nder, samples=n_test)
+    return (x_test)    
      
 def error_est(origin_func, approx, points):
     error = la.norm(origin_func(*points.T) - approx(*points.T),np.inf) / la.norm(origin_func(*points.T), np.inf)
     return (error)
 
-
 ### returns 2 values - function on domain, and block structured
 def gauss_sp(x,y):
     func = 2*exp(-((x**2)/2. + (y**2)/2.))
-    return func
+    return (func)
+
+def quadro_3(x,y,z):
+    return(2*((x**2)/2. + (y**2)/2. + (z**2)/2.))
+
+def many_dim_sp(x,y,z,a,b):
+    func = sin(x+y+z) + a*b
+    return (func)
+
+def linear_sp(x,y):
+    return (5*x + x**2 + y**2)
 
 gauss, _ = symb_to_func(gauss_sp, 2)
+many_dim, _ = symb_to_func(many_dim_sp,5)
+linear,_ = symb_to_func(linear_sp,2)
 
-gauss.diff = (FindDiff(gauss_sp, 2, i, False) for i in range(2))
+gauss.diff = [FindDiff(gauss_sp, 2, i, False) for i in range(1,3)]
+many_dim.diff = [FindDiff(many_dim_sp, 5, i, False) for i in range(1,6)]
+linear.diff = [FindDiff(linear, 2, i, False) for i in range(1,3)]
+quadro_3.diff = [FindDiff(quadro_3, 3, i, False) for i in range(1,4)]
 
+def RHS(function,nder,points):
+    func = function(*points.T)
+    func_diff = [function.diff[i](*points.T) for i in range(len(function.diff))]
+    block_rhs = np.zeros((nder+1)*(points.shape[0]))
+    for i in range(points.shape[0]):
+        block_rhs[i*(nder+1)] = func[i]
+        for j in range(nder):
+            block_rhs[i*(nder+1)+j+1] = func_diff[j][i]
+    return (block_rhs)        
