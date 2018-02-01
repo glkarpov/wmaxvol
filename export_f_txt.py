@@ -4,6 +4,7 @@
 import numpy as np
 from sympy import *
 
+
 ### Main fucns
 
 def SymbVars(l, name='x'):
@@ -54,21 +55,28 @@ def symb_to_func_old(func, l, is_func=True):
     vars_f = StrVars(l, delim=', ')
     return eval("lambda  " + vars_f + " :  " + ans  ), ans
 
-def symb_to_func(func, l, is_func=True):
+def symb_to_func(func, l, is_func=True, ret_str=True):
     """
     INPUT
         func -- function
         l    -- dimension
         is_func -- shows, whether func is lambda func of expression
+        ret_str -- also return string representation of the func as the second arg of the return tuple
     RETURNS 
         lambda - func from sympy obj
     """
     # vars_f = symbols(   ', '.join([ 'x' + str(i) for i in xrange(l) ])  )
     vars_f = SymbVars(l)
-    if is_func:
-        return utilities.lambdify(vars_f, func(*vars_f), 'numpy'), export_f_txt(func, l)
+    if ret_str:
+        if is_func:
+            return utilities.lambdify(vars_f, func(*vars_f), 'numpy'), export_f_txt(func, l)
+        else:
+            return utilities.lambdify(vars_f, func, 'numpy'), str(func)
     else:
-        return utilities.lambdify(vars_f, func, 'numpy'), str(func)
+        if is_func:
+            return utilities.lambdify(vars_f, func(*vars_f), 'numpy')
+        else:
+            return utilities.lambdify(vars_f, func, 'numpy')
 
     
 
@@ -125,13 +133,20 @@ def To_math(s):
 
     return s
 
-def FindDiff(f, d, i=1, ret_symb=False):
+def FindDiff(f, d=None, i=1, ret_symb=False):
     """
         f -- function
         d -- dimension
         i -- diff the func w.r.t. ith arg, i<=d
         ret_symb -- whether to return symbolic representation along with func
     """
+
+    if d is None:
+        from inspect import getargspec
+        d = len(getargspec(f).args)
+
+    assert(1 <= i <= d)
+
     vars_f = SymbVars(d)
     fd = diff(f(*vars_f), vars_f[i-1])
     fout, _ = symb_to_func(fd, d, False)

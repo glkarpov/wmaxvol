@@ -210,7 +210,13 @@ many_dim.diff = [FindDiff(many_dim_sp, 5, i, False) for i in range(1,6)]
 linear.diff = [FindDiff(linear, 2, i, False) for i in range(1,3)]
 quadro_3.diff = [FindDiff(quadro_3, 3, i, False) for i in range(1,4)]
 
-def RHS(function,nder,points):
+def RHS(function, nder, points):
+    """
+    Form RH-side from function and its derivative
+    """
+
+    """
+    old realization
     func = function(*points.T)
     func_diff = [function.diff[i](*points.T) for i in range(len(function.diff))]
     block_rhs = np.zeros((nder+1)*(points.shape[0]))
@@ -218,4 +224,15 @@ def RHS(function,nder,points):
         block_rhs[i*(nder+1)] = func[i]
         for j in range(nder):
             block_rhs[i*(nder+1)+j+1] = func_diff[j][i]
-    return (block_rhs)        
+
+    """
+
+    nder1 = nder + 1
+    block_rhs = np.empty(nder1*points.shape[0], dtype=points.dtype)
+    block_rhs[::nder1] = function(*points.T)
+    for j in range(nder):
+        block_rhs[j+1::nder1] = function.diff[j](*points.T)
+
+    return block_rhs
+
+
