@@ -82,7 +82,6 @@ def symb_to_func(func, l, is_func=True, ret_str=True):
 
 def find_brack(s, i):
     # find corresponding brackets (square and circle)
-    ret = -1
     fnd = None
     br_cur = s[i]
     if br_cur == '(':
@@ -97,11 +96,11 @@ def find_brack(s, i):
     while i < len(s):
         if s[i] == br_cur:
             br_count += 1
-        if s[i] == fnd:
+        elif s[i] == fnd:
             br_count -= 1
             if br_count == 0:
                 return i
-                break
+
         i += 1
 
     return -1
@@ -149,7 +148,7 @@ def FindDiff(f, d=None, i=1, ret_symb=False):
 
     vars_f = SymbVars(d)
     fd = diff(f(*vars_f), vars_f[i-1])
-    fout, _ = symb_to_func(fd, d, False)
+    fout = symb_to_func(fd, d, False, False)
     if ret_symb:
         return fout, fd
     else:

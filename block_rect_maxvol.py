@@ -187,8 +187,8 @@ def error_est(origin_func, approx, points):
 
 ### returns 2 values - function on domain, and block structured
 def gauss_sp(x,y):
-    func = 2*exp(-((x**2)/2. + (y**2)/2.))
-    return func
+    return 2*exp(-((x**2)/2. + (y**2)/2.))
+
 
 def quadro_3(x,y,z):
     return (2*((x**2)/2. + (y**2)/2. + (z**2)/2.))
@@ -200,16 +200,21 @@ def many_dim_sp(x,y,z,a,b):
 def linear_sp(x,y):
     return (5*x + x**2 + y**2)
 
-gauss     = symb_to_func(gauss_sp,    2, False)
-many_dim  = symb_to_func(many_dim_sp, 5, False)
-linear    = symb_to_func(linear_sp,   2, False)
+# print 'Initializations'
 
-gauss.diff    = [FindDiff(gauss_sp, 2, i, False) for i in range(1,3)]
+# quadro_3  = symb_to_func(quadro_3,    3, True, False)
+gauss     = symb_to_func(gauss_sp,    2, True, False)
+many_dim  = symb_to_func(many_dim_sp, 5, True, False)
+linear    = symb_to_func(linear_sp,   2, True, False)
+
+# print 'Funcs Got'
+
+gauss.diff    = [FindDiff(gauss_sp,    2, i, False) for i in range(1,3)]
 many_dim.diff = [FindDiff(many_dim_sp, 5, i, False) for i in range(1,6)]
-linear.diff   = [FindDiff(linear, 2, i, False) for i in range(1,3)]
-quadro_3.diff = [FindDiff(quadro_3, 3, i, False) for i in range(1,4)]
+linear.diff   = [FindDiff(linear,      2, i, False) for i in range(1,3)]
+quadro_3.diff = [FindDiff(quadro_3,    3, i, False) for i in range(1,4)]
 
-def RHS(function, nder, points):
+def RHS(function, points):
     """
     Form RH-side from function and its derivative
     """
@@ -226,6 +231,7 @@ def RHS(function, nder, points):
 
     """
 
+    nder= points.shape[1]
     nder1 = nder + 1
     block_rhs = np.empty(nder1*points.shape[0], dtype=points.dtype)
     block_rhs[::nder1] = function(*points.T)
