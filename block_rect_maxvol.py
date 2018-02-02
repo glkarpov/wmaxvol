@@ -147,7 +147,7 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     piv = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
     cut_piv = piv[:N_rows]
     
-    block_func_deriv = RHS(function,nder,x)
+    block_func_deriv = RHS(function,x)
     c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
     
     taken_p = x[cut_piv[::(nder+1)]/(nder+1),:]
@@ -160,7 +160,7 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     plt.ylim(l_bound-0.15, u_bound+0.15)
     plt.plot(taken_p[:,0],taken_p[:,1], 'b^', label = "BMV")
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, borderaxespad=0.)
-    plt.figtext(.8, .8, "E = {}".format(error))
+    plt.title("E = {}".format(error))
     plt.grid(True)
     fn = 'func={}_d={}_num={}_nder={}.pdf'.format(function.__name__, N_column, N_rows, nder)
     plt.savefig(fn)
