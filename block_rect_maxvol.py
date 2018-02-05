@@ -4,7 +4,7 @@ import ids
 from block_maxvol import *
 from gen_mat import *
 from sympy import *
-from export_f_txt import FindDiff, symb_to_func
+from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
 
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
@@ -167,8 +167,9 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     return error
 
 def approximant(nder, coef):
-    components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
-    sym_monoms = GenMat(coef.shape[0], np.array([components]),poly=cheb, debug=False,pow_p=1,ToGenDiff=False)
+    # components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
+    components = SymbVars(nder)
+    sym_monoms = GenMat(coef.shape[0], np.array([components]), poly=cheb, debug=False, pow_p=1, ToGenDiff=False)
     evaluate = np.dot(sym_monoms[0], coef)
     evaluate = simplify(evaluate)
     res = utilities.lambdify(components, evaluate, 'numpy')
@@ -202,21 +203,13 @@ def linear_sp(x,y):
 
 # print 'Initializations'
 
-# quadro_3  = symb_to_func(quadro_3,    3, True, False)
-gauss     = symb_to_func(gauss_sp,    2, True, False)
-many_dim  = symb_to_func(many_dim_sp, 5, True, False)
-linear    = symb_to_func(linear_sp,   2, True, False)
+# quadro_3  = symb_to_func(quadro_3,    3, True, False, name='Quadro')
+gauss     = symb_to_func(gauss_sp,    2, True, False, name='Gauss')
+many_dim  = symb_to_func(many_dim_sp, 5, True, False, name='Myltivariate')
+linear    = symb_to_func(linear_sp,   2, True, False, name='Linear')
 
-gauss.__name__ = 'Gauss'
 # print 'Funcs Got'
 
-def MakeDiffs(func, d, to_vec=False):
-    if to_vec:
-        diff = [np.vectorize(FindDiff(func,    d, i+1, False)) for i in range(d)]
-    else:
-        diff = [FindDiff(func,    d, i+1, False) for i in range(d)]
-        
-    return diff
 
 """
 gauss.diff    = [FindDiff(gauss_sp,    2, i, False) for i in range(1,3)]
@@ -227,6 +220,8 @@ quadro_3.diff = [FindDiff(quadro_3,    3, i, False) for i in range(1,4)]
 
 gauss.diff  = MakeDiffs(gauss_sp, 2)
 linear.diff = MakeDiffs(linear_sp, 2, True)
+many_dim.diff = MakeDiffs(many_dim_sp, 5, True)
+quadro_3.diff = MakeDiffs(quadro_3, 3, True)
 
 def RHS(function, points):
     """

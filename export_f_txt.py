@@ -34,28 +34,8 @@ def export_f_Math(func, l, func_name='F'):
     vars_f = StrVars(l, delim=', ', add_on = '_')
     return "{}[{}]:={}".format(func_name, vars_f, ans)
 
-def symb_to_func_old(func, l, is_func=True):
-    """
-    INPUT
-        func -- function
-        l    -- dimension
-        is_func  -- whether func is usual func (True) or sympy object (False)
-    RETURNS 
-        lambda - func from synpy obj
-    """
-    if is_func:
-        ans = export_f_txt(func, l)
-    else:
-        ans = str(func)
-    #replaces
-    for i in ['exp','cos', 'sin']:
-        ans = ans.replace(i + '(', 'np.' + i +'(')
 
-    # vars_f = ', '.join(['x' + str(i) for i in xrange(l)])
-    vars_f = StrVars(l, delim=', ')
-    return eval("lambda  " + vars_f + " :  " + ans  ), ans
-
-def symb_to_func(func, l, is_func=True, ret_str=True):
+def symb_to_func(func, l, is_func=True, ret_str=True, name=None):
     """
     INPUT
         func -- function
@@ -67,16 +47,27 @@ def symb_to_func(func, l, is_func=True, ret_str=True):
     """
     # vars_f = symbols(   ', '.join([ 'x' + str(i) for i in xrange(l) ])  )
     vars_f = SymbVars(l)
+    if is_func:
+        ul = utilities.lambdify(vars_f, func(*vars_f), 'numpy')
+    else:
+        ul = utilities.lambdify(vars_f, func, 'numpy')
+
+    try:
+        ul.__name__ = func.__name__
+        ul.__doc__  = func.__doc__
+    except:
+        pass
+
+    if name is not None:
+        ul.__name__ = name
+
     if ret_str:
         if is_func:
-            return utilities.lambdify(vars_f, func(*vars_f), 'numpy'), export_f_txt(func, l)
+            return ul, export_f_txt(func, l)
         else:
-            return utilities.lambdify(vars_f, func, 'numpy'), str(func)
+            return ul, str(func)
     else:
-        if is_func:
-            return utilities.lambdify(vars_f, func(*vars_f), 'numpy')
-        else:
-            return utilities.lambdify(vars_f, func, 'numpy')
+        return ul
 
     
 
@@ -153,6 +144,23 @@ def FindDiff(f, d=None, i=1, ret_symb=False):
         return fout, fd
     else:
         return fout
+
+
+def MakeDiffs(func, d=None, to_vec=False):
+    """
+        INPUT
+        f -- function
+        d -- dimension
+    """
+    if d is None:
+        from inspect import getargspec
+        d = len(getargspec(func).args)
+
+    if to_vec:
+        diff = [np.vectorize(FindDiff(func, d, i+1, False)) for i in range(d)]
+    else:
+        diff = [FindDiff(func, d, i+1, False) for i in range(d)]
+    return diff
 
 
 if __name__ == '__main__':
