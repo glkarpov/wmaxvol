@@ -158,7 +158,7 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     u_bound = np.amax(x)
     plt.xlim(l_bound-0.15, u_bound+0.15)
     plt.ylim(l_bound-0.15, u_bound+0.15)
-    plt.plot(taken_p[:,0],taken_p[:,1], 'b^', label = "BMV")
+    plt.plot(taken_p[:,0],taken_p[:,1], 'b^')
     plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, borderaxespad=0.)
     plt.title("E = {}".format(error))
     plt.grid(True)
@@ -198,7 +198,7 @@ def many_dim_sp(x,y,z,a,b):
     return func
 
 def linear_sp(x,y):
-    return (5*x + x**2 + y**2)
+    return (5*x + 2*y)
 
 # print 'Initializations'
 
@@ -207,12 +207,26 @@ gauss     = symb_to_func(gauss_sp,    2, True, False)
 many_dim  = symb_to_func(many_dim_sp, 5, True, False)
 linear    = symb_to_func(linear_sp,   2, True, False)
 
+gauss.__name__ = 'Gauss'
 # print 'Funcs Got'
 
+def MakeDiffs(func, d, to_vec=False):
+    if to_vec:
+        diff = [np.vectorize(FindDiff(func,    d, i+1, False)) for i in range(d)]
+    else:
+        diff = [FindDiff(func,    d, i+1, False) for i in range(d)]
+        
+    return diff
+
+"""
 gauss.diff    = [FindDiff(gauss_sp,    2, i, False) for i in range(1,3)]
 many_dim.diff = [FindDiff(many_dim_sp, 5, i, False) for i in range(1,6)]
-linear.diff   = [FindDiff(linear,      2, i, False) for i in range(1,3)]
+linear.diff   = [FindDiff(np.vectorize(linear),      2, i, False) for i in range(1,3)]
 quadro_3.diff = [FindDiff(quadro_3,    3, i, False) for i in range(1,4)]
+"""
+
+gauss.diff  = MakeDiffs(gauss_sp, 2)
+linear.diff = MakeDiffs(linear_sp, 2, True)
 
 def RHS(function, points):
     """
