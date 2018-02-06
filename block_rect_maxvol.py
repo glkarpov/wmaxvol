@@ -6,6 +6,8 @@ from gen_mat import *
 from sympy import *
 from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
+from numba import jit
+
 
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
 class lining:
@@ -26,6 +28,7 @@ class lining:
         return np.dot(self.left, self.right_prod())
 
 # main func to form new coeff matrix
+@jit  
 def rect_core(C, C_sigma, ndim):
     inv_block = la.inv(np.eye(ndim) + np.dot(C_sigma, C_sigma.conjugate().T))
     puzzle = lining(C_sigma,inv_block)
@@ -33,14 +36,15 @@ def rect_core(C, C_sigma, ndim):
     C_new = lining(C,U,inv = True).left_prod()
     return C_new, puzzle.assemble()
 
+@jit
 def form_permute(C, j, ind): #  REMOVE THIS
     C[ind],C[j]=C[j],C[ind]
 
-
+@jit
 def mov_row(C, j, ind_x): #  REMOVE THIS
     C[[ind_x,j],:] = C[[j,ind_x],:]
 
-
+@jit  
 def cold_start(C, ndim):
     n = C.shape[0]
     k = n // ndim
@@ -54,7 +58,7 @@ def cold_start(C, ndim):
 def matrix_prep(A, ndim, l):
     return A[ np.arange(l*ndim).reshape(ndim, l).flatten(order='F') , :]
 
-
+@jit  
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     ndim = nder + 1
     M, n = A_init.shape

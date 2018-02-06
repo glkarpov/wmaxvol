@@ -2,6 +2,7 @@ import numpy as np
 from maxvolpy.maxvol import maxvol
 from scipy.linalg import lu as lu
 import scipy.linalg 
+from numba import jit
 
 ### how to make from permatation matrix readable array
 def perm_array(A):
@@ -30,26 +31,28 @@ def p_preproc(p,ndim):
         loc[j:j+ndim] = np.sort(loc[j:j+ndim])
     return(loc)
 
+@jit        
+def elimination(L,U,ind):
+    k = L.shape[0]
+    for i in range(ind+1, k):
+        L[i,ind] = U[i,ind]/U[ind,ind]
+        U[i,ind:] -= L[i,ind]*U[ind,ind:] 
+    return ()  
+    
 def plu(A):
     n, m = A.shape[0], A.shape[1]
     P = np.eye((n), dtype=float)
-    L = np.eye((m), dtype=float)
-    L_add = np.zeros((n-m, m), dtype=float)
-    L = np.concatenate((L, L_add), axis = 0)
+    L = np.eye(n, m, dtype=A.dtype)
     U = np.copy(A)
     for j in range(0, m):
         loc_max = np.argmax(np.abs(U[j:, j]))
-        temp = np.copy(U[j+loc_max,j:])
-        U[j+loc_max,j:] = U[j, j:]
-        U[j, j:] = temp
 
-        temp = np.copy(L[j+loc_max,:j])
-        L[j+loc_max,:j] = L[j, :j]
-        L[j, :j] = temp    
-
-        temp = np.copy(P[j+loc_max,:])
-        P[j+loc_max,:] = P[j, :]
-        P[j, :] = temp     
+        U[[j+loc_max,j],j:] = U[[j,j+loc_max], j:]
+        
+        L[[j+loc_max,j],:j] = L[[j,j+loc_max], :j]
+        
+        P[[j+loc_max,j],:] = P[[j,j+loc_max], :]
+        
         
         for i in range(j+1, n):
             L[i,j] = U[i,j]/U[j,j]
@@ -131,29 +134,8 @@ def change_intersept(inew, iold, full=True):
     idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
     return  idx_n, idx_o
 
-def pluq_ids(A, nder = 1, debug = False):
-            
-    def elimination(L,U,ind):
-        k = L.shape[0]
-        for i in range(ind+1, k):
-            L[i,ind] = U[i,ind]/U[ind,ind]
-            U[i,ind:] -= L[i,ind]*U[ind,ind:] 
-        return ()    
-    
-    def restore_lu(L,U,ind):
-        k = L.shape[0]
-        for i in range(ind+1, k):
-            U[i,ind:] += L[i,ind]*U[ind,ind:]
-        return (U)
-    
-    def restore_layer(L,U,ind, ndim):
-        k = L.shape[0]
-        for j in range(ndim + ind-1,ind-1, -1):
-            for i in range(j+1, k):
-                U[i,j:] += L[i,j]*U[j,j:]    
-        return (U)
-    
-    def det_search(A,start_ind1, start_ind2):
+@jit
+def det_search(A, ndim,start_ind1, start_ind2,black_list):
         det = 0.0
         row = start_ind1 
 
@@ -168,7 +150,24 @@ def pluq_ids(A, nder = 1, debug = False):
                     if np.abs(np.linalg.det(pair[piv])) > det:
                         det, row = np.abs(np.linalg.det(pair[piv])), k
                 
-        return(det, row)        
+        return(det, row)
+
+def pluq_ids(A, nder = 1, debug = False):  
+    
+    def restore_lu(L,U,ind):
+        k = L.shape[0]
+        for i in range(ind+1, k):
+            U[i,ind:] += L[i,ind]*U[ind,ind:]
+        return (U)
+    
+    def restore_layer(L,U,ind, ndim):
+        k = L.shape[0]
+        for j in range(ndim + ind-1,ind-1, -1):
+            for i in range(j+1, k):
+                U[i,j:] += L[i,j]*U[j,j:]    
+        return (U)
+    
+            
                 
     n, m = A.shape[0], A.shape[1]
     P = np.arange(n)
@@ -185,7 +184,7 @@ def pluq_ids(A, nder = 1, debug = False):
     while (j < m):
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
         ### 'k'- pair counter, which starts from current j position till the bottom of the matrix
-        max_det, row_n = det_search(U,j,j)
+        max_det, row_n = det_search(U,ndim,j,j,black_list)
         if (max_det == 0.0) and (j == 0):
             ### Critical error = no appropriate pair
             info[0] = 1
@@ -199,7 +198,7 @@ def pluq_ids(A, nder = 1, debug = False):
             if debug:
             	print ('restored matrix')
             	print (U)
-            max_det, row_n = det_search(U,j+ndim,j)
+            max_det, row_n = det_search(U,ndim,j+ndim,j,black_list)
             if max_det == 0.0:
                 # Critical error = all elements are in blacklist
                 info[0] = 1

@@ -1,5 +1,7 @@
 import numpy as np
+from numba import jit
 
+@jit
 def SWM(C, ndim, i, j):
     B = np.copy(C)
     tmp_columns = np.copy(B[:,j:j + ndim])
@@ -12,7 +14,7 @@ def SWM(C, ndim, i, j):
     tmp_rows[:,j:j + ndim] -= np.eye(ndim)
     
     B -= np.dot(tmp_columns, np.dot(np.linalg.inv(b),tmp_rows))
-    return B
+    return (B)
 
 def form_permute(C, j, ind):
     C[ind],C[j]=C[j],C[ind]
@@ -21,6 +23,7 @@ def form_permute(C, j, ind):
 def mov_row(C, j, ind_x):
     C[[ind_x,j],:] = C[[j,ind_x],:]
 
+@jit
 def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd = True, debug = False):
 # work on parameters
     ids_init = A_init[:A_init.shape[1]]
@@ -76,4 +79,4 @@ def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd = True, debug = 
             iters += 1
         else:
             Fl = False 
-    return(A, temp, P)   
+    return (A, temp, P)   
