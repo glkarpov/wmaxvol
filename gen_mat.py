@@ -1,7 +1,8 @@
 #! /bin/env python
 # -*- coding: utf-8 -*-
 
-import numpy as np
+import numpy as rnp
+import autograd.numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from numpy.polynomial.hermite import hermval
@@ -65,7 +66,7 @@ def binom_sh(p,l):
     (p+l\\p) = (p+l)!/p!*l!
     meaning number of monoms to approx. function, with l vars and poly. power <= p
     """
-    return int(  np.math.factorial(p+l)//(np.math.factorial(p)*np.math.factorial(l))  )
+    return int(  rnp.math.factorial(p+l)//(rnp.math.factorial(p)*rnp.math.factorial(l))  )
 
 def OnesFixed(m, n):
     """
@@ -225,7 +226,7 @@ def herm_snorm(n):
     Square norm of "math" Hermite (exp(-x^2/2))
     """
     # return (2**n)*np.math.factorial(n)*sqrt_pi
-    return np.math.factorial(n)*sqrt_pi2
+    return rnp.math.factorial(n)*sqrt_pi2
 
 
 
@@ -238,7 +239,7 @@ def herm(x, n):
     cf = np.zeros(n+1)
     cf[n] = 1
     #return hermval(x, cf)
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n))) # norm
+    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(rnp.math.factorial(n))) # norm
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
 def herm_diff(x, n):
@@ -246,7 +247,7 @@ def herm_diff(x, n):
         return 0
     cf = np.zeros(n)
     cf[n-1] = 1
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(np.math.factorial(n))) # norm
+    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(rnp.math.factorial(n))) # norm
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)/nc
 
 def herm_norm_snorm(n):
@@ -315,6 +316,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         or a_{ij}=H'_{i mod l}(x_j), where derivatives are taken on coordinate with number i//l
     """
 
+    # global temp, x_temp
     n2, l = x.shape
     if poly is not None:
         if not isinstance(poly, list):
@@ -329,7 +331,10 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
     else:
         nA = n2
-    A = np.zeros((nA, n_size), dtype=x.dtype)
+
+    if ToGenDiff:
+        A = np.empty((nA, n_size), dtype=x.dtype)
+
     if debug:
         print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
 
@@ -338,13 +343,25 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     else:
         assert(len(indeces) == n_size)
 
+    A_res = []
     for i, xp in enumerate(indeces):
         if debug:
             print ('monom #{} is {}'.format(i, xp))
-        A[0:n2, i] = herm_mult_many(x, xp, poly)
+        # temp = herm_mult_many(x, xp, poly)
+        # x_temp = x
+
+        if ToGenDiff:
+            A[0:n2, i] = herm_mult_many(x, xp, poly)
+        else:
+            A_res.append(herm_mult_many(x, xp, poly))
+
+
         if ToGenDiff:
             for dl in xrange(1, l+1):
                 A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
+
+    if not ToGenDiff:
+        A = np.vstack(A_res).T
 
     return A
 

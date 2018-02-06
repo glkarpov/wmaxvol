@@ -1,8 +1,9 @@
 
 # coding: utf-8
 
-import numpy as np
-import numpy.linalg as LA
+# import numpy as np
+import autograd.numpy as np
+import autograd.numpy.linalg as LA
 from numpy.polynomial import Chebyshev as T
 import gen_mat as gen
 from numba import jit
@@ -65,8 +66,8 @@ def grad(points):
 @jit(parallel = True, nogil = True)
 # this is stable calculation of objective function to minimize -log(det(A.T*A)) 
 def loss_func(points):
-    points = np.stack(np.split(points.T.ravel(),dim),1)
-    A = np.split(gen.GenMat(num_col, points, poly = gen.cheb, poly_diff = gen.cheb_diff), dim + 1)[0]
+    points = points.reshape(points.size // dim, dim, order='F')
+    A = gen.GenMat(num_col, points, poly = gen.cheb, poly_diff = gen.cheb_diff, ToGenDiff=False)
     S = LA.svd(A, compute_uv = False)
     ld = 2.0*np.sum(np.log(S))
-    return -ld 
+    return -ld
