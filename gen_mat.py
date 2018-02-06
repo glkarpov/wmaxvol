@@ -305,7 +305,7 @@ def legendre_snorm(n, interval=(-1.0, 1.0)):
 
 # Main func
 
-def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True):
+def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True, IsTypeGood=True):
     """
     INPUT
         n_size — number of colomns (monoms), int
@@ -332,8 +332,13 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     else:
         nA = n2
 
-    if ToGenDiff:
+    ss = """<class 'autograd"""
+    IsTypeGood = IsTypeGood and str(x.__class__)[:len(ss)] != ss
+
+    if IsTypeGood:
         A = np.empty((nA, n_size), dtype=x.dtype)
+    else:
+        A = []
 
     if debug:
         print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
@@ -343,27 +348,27 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     else:
         assert(len(indeces) == n_size)
 
-    A_res = []
     for i, xp in enumerate(indeces):
         if debug:
             print ('monom #{} is {}'.format(i, xp))
         # temp = herm_mult_many(x, xp, poly)
         # x_temp = x
 
-        if ToGenDiff:
+        if IsTypeGood:
             A[0:n2, i] = herm_mult_many(x, xp, poly)
         else:
-            A_res.append(herm_mult_many(x, xp, poly))
+            A.append(herm_mult_many(x, xp, poly))
 
-
+        # TODO: Process this code with the case IsTypeGood == False
         if ToGenDiff:
             for dl in xrange(1, l+1):
                 A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
 
-    if not ToGenDiff:
-        A = np.vstack(A_res).T
+    if not IsTypeGood:
+        A = np.vstack(A).T
 
     return A
+
 
 def CronProdX(wts, rng):
     """
