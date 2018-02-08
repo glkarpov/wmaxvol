@@ -40,7 +40,7 @@ def elimination(L,U,ind):
     return ()  
     
 def plu(A):
-    n, m = A.shape[0], A.shape[1]
+    n, m = A.shape
     P = np.eye((n), dtype=float)
     L = np.eye(n, m, dtype=A.dtype)
     U = np.copy(A)
@@ -60,6 +60,42 @@ def plu(A):
            
     return(P, L, U)       
 
+# Some opt. staff
+def LU_opt(A):
+    LU = A.copy()
+    m = A.shape[0]
+    p = np.arange(m)
+
+    for k in xrange(m-1):
+        i = np.argmax(np.abs(LU[p[k:], k])) + k
+        p[[i, k]] = p[[k, i]]
+
+        p_k = p[k]
+        for p_j in p[k+1:]:
+            LU[p_j, k   ]  = LU[p_j, k] / LU[p_k, k]
+            LU[p_j, k+1:] -= LU[p_j, k] * LU[p_k, k+1:]
+
+    return p, LU
+
+
+def MakeLU(p, LU):
+    n = p.size
+    L = np.zeros_like(LU)
+    U = np.zeros_like(LU)
+    for i, p_i in enumerate(p):
+        for j in xrange(n):
+            if i == j:
+                L[i, j] = 1
+                U[i, j] = LU[p_i, j]
+            else:
+                if i < j:
+                    U[i, j] = LU[p_i, j]
+                else:
+                    L[i, j] = LU[p_i, j]
+
+    return np.eye(n, dtype=int)[p], L, U
+
+# ---------------------------------------------------------
 
 def pluq(A):
     def mov_permute(C, j, ind, m = 'P'):

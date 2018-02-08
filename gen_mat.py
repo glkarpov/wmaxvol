@@ -159,7 +159,7 @@ def herm_mult_many(x, xi, poly_func=None):
     return res
 
 
-def herm_mult_many_diff(x, xi, diff_var, poly_func=None, poly_diff=None):
+def herm_mult_many_diff(x, xi, diff_var, poly_func=None):
     """
     INPUT
     x - array of point where to calculate (np.array N x l)
@@ -176,12 +176,11 @@ def herm_mult_many_diff(x, xi, diff_var, poly_func=None, poly_diff=None):
 
     if poly_func is None:
         poly_func = [herm] * l
-        poly_diff = [herm_diff] * l
 
     res = np.ones(N, dtype=x.dtype)
     for n in xrange(l):
         if n == diff_var:
-            res *= poly_diff[n](x[:, n], xi[n])
+            res *= poly_func[n].diff(x[:, n], xi[n])
         else:
             res *= poly_func[n](x[:, n], xi[n])
     
@@ -201,8 +200,13 @@ def cheb(x, n):
 def cheb_diff(x, n):
     return T.basis(n).deriv(1)(x)
 
+
+
 def cheb_snorm(n):
     return np.pi/2.0 if n != 0 else np.pi
+
+cheb.diff = cheb_diff
+cheb.snorm = cheb_snorm
 
 def herm_nn(x, n):
     """
@@ -228,6 +232,9 @@ def herm_snorm(n):
     # return (2**n)*np.math.factorial(n)*sqrt_pi
     return rnp.math.factorial(n)*sqrt_pi2
 
+
+herm_nn.diff = herm_diff_nn
+herm_nn.snorm = herm_snorm
 
 
 def herm(x, n):
@@ -256,6 +263,8 @@ def herm_norm_snorm(n):
     """
     return 1.0
 
+herm.diff = herm_diff
+herm.snorm = herm_norm_snorm
 
 def trigpoly(xin, n, interval=(-1,1)):
     """
@@ -280,7 +289,7 @@ def trigpoly_diff(xin, n, interval=(-1,1)):
 
     return tpow*func(tpow*x)
 
-
+trigpoly.diff = trigpoly_diff
 
 
 def legendre(x, n, interval=(-1.0, 1.0)):
@@ -301,6 +310,8 @@ def legendre_snorm(n, interval=(-1.0, 1.0)):
     # return 2.0/(2.0*n + 1.0)
     return (interval[1] - interval[0])/(2.0*n + 1.0)
 
+legendre.diff = legendre_diff
+legendre.snorm = legendre_snorm
     
 
 # Main func
@@ -322,10 +333,16 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         if not isinstance(poly, list):
             assert(callable(poly))
             poly = [poly] * l
+
+    if poly_diff is not None:
+        print """Parameter "poly_diff" is obsolete! Do not use it in func 'GenMat'"""
+
+    """
     if poly_diff is not None:
         if not isinstance(poly_diff, list):
             assert(callable(poly_diff))
             poly_diff = [poly_diff] * l
+    """
 
     if ToGenDiff:
         nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
@@ -362,7 +379,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         # TODO: Process this code with the case IsTypeGood == False
         if ToGenDiff:
             for dl in xrange(1, l+1):
-                A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly, poly_diff)
+                A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly)
 
     if not IsTypeGood:
         A = np.vstack(A).T
