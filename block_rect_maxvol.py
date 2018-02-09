@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import ids
+from ids import SingularError
 from block_maxvol import *
 from gen_mat import *
 from sympy import *
@@ -82,7 +83,7 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
         if (Fl_cs == False):
             ind_array = la.det(np.eye(ndim) + CC_sigma)
             elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
-            print elem
+            #print elem
             if (ind_array[elem] > 1 + t):
                 CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
                 for idx in range(ndim):
@@ -104,7 +105,7 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
             CC_sigma = cold_start(C_w, ndim)
             ind_array = la.det(np.eye(ndim) + CC_sigma)
             elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
-            print elem
+            #print elem
             if (ind_array[elem] > 1 + t):
                 CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
                 for idx in range(ndim):
@@ -124,7 +125,7 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
             
 
     return (C_w, CC_sigma, P)
-    
+@jit    
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
     assert (A.shape[1] % (nder+1) == 0)
     assert (A.shape[0] % (nder+1) == 0)
@@ -154,10 +155,11 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     block_func_deriv = RHS(function,x)
     c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
     
-    taken_p = x[cut_piv[::(nder+1)]/(nder+1),:]
+    taken_indices = cut_piv[::(nder+1)]/(nder+1)
     approx_calcul = approximant(nder,c_block)
     error = error_est(function, approx_calcul, x_test)
     
+    '''
     l_bound = np.amin(x)
     u_bound = np.amax(x)
     plt.xlim(l_bound-0.15, u_bound+0.15)
@@ -168,7 +170,8 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     plt.grid(True)
     fn = 'func={}_d={}_num={}_nder={}.pdf'.format(function.__name__, N_column, N_rows, nder)
     plt.savefig(fn)
-    return error
+    '''
+    return error, taken_indices
 
 def approximant(nder, coef):
     # components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
@@ -194,6 +197,14 @@ def error_est(origin_func, approx, points):
 def gauss_sp(x,y):
     return 2*exp(-((x**2)/2. + (y**2)/2.))
 
+def sincos_sp(x,y):
+    return (sin((x**2)/2. - (y**2)/4. + 3) * cos(2*x + 1 - exp(y)))
+
+def rosenbrock_sp(x,y):
+    return ((1 - x)**2 + 100*(y - x**2)**2)
+
+def roots_sp(x,y):
+    return (sqrt((x+2)**2 + (y+3)**2))
 
 def quadro_3(x,y,z):
     return (2*((x**2)/2. + (y**2)/2. + (z**2)/2.))
@@ -209,6 +220,9 @@ def linear_sp(x,y):
 
 # quadro_3  = symb_to_func(quadro_3,    3, True, False, name='Quadro')
 gauss     = symb_to_func(gauss_sp,    2, True, False, name='Gauss')
+sincos    = symb_to_func(sincos_sp,    2, True, False, name='Sincos')
+rosenbrock =symb_to_func(rosenbrock_sp, 2, True, False, name='Rosenbrock')
+roots     = symb_to_func(roots_sp,    2, True, False, name='Roots')
 many_dim  = symb_to_func(many_dim_sp, 5, True, False, name='Myltivariate')
 linear    = symb_to_func(linear_sp,   2, True, False, name='Linear')
 
@@ -223,6 +237,9 @@ quadro_3.diff = [FindDiff(quadro_3,    3, i, False) for i in range(1,4)]
 """
 
 gauss.diff  = MakeDiffs(gauss_sp, 2)
+sincos.diff  = MakeDiffs(sincos_sp, 2)
+rosenbrock.diff = MakeDiffs(rosenbrock_sp, 2)
+roots.diff    = MakeDiffs(roots_sp, 2)
 linear.diff = MakeDiffs(linear_sp, 2, True)
 many_dim.diff = MakeDiffs(many_dim_sp, 5, True)
 quadro_3.diff = MakeDiffs(quadro_3, 3, True)

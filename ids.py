@@ -298,10 +298,17 @@ def pluq_ids(A, nder = 1, debug = False):
     P_pr = p_preproc(P, ndim)
     return(P_pr,L,U,Q,info) 
 #--------------------------------------------------------------
+
+class SingularError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+#--------------------------------------------------------------
 @jit
 def det_search_index(A,Arow, Acol, ndim,start_ind1, start_ind2):
     det = 0.0
     row = start_ind1 
+    loc_piv = np.zeros(ndim)
     final_piv = np.zeros(ndim)
     for k in range(start_ind1,A.shape[0],ndim):
           
@@ -311,13 +318,13 @@ def det_search_index(A,Arow, Acol, ndim,start_ind1, start_ind2):
         if rank == ndim :
             loc_piv,_ = maxvol(pair)
             if np.abs(np.linalg.det(pair[loc_piv])) > det:
-                det, row = np.abs(np.linalg.det(pair[loc_piv])), k
+                det, row, final_piv = np.abs(np.linalg.det(pair[loc_piv])), k, loc_piv
                 
     return(det, row)
 
-
+@jit
 def pluq_ids_index(A, nder, debug = False):  
-   
+    
     n, m = A.shape[0],A.shape[1]
     P, Q = np.arange(n), np.arange(m)
     L = np.eye(n, m, dtype=A.dtype)
@@ -325,7 +332,6 @@ def pluq_ids_index(A, nder, debug = False):
     Urow, Ucol  = np.arange(n), np.arange(m)
     Lrow, Lcol = np.arange(n), np.arange(m)
     ndim = nder + 1
-  
     info = np.zeros((2), dtype=int)
     
     j = 0
@@ -336,12 +342,16 @@ def pluq_ids_index(A, nder, debug = False):
         if (max_det == 0.0) and (j == 0):
             ### Critical error = no appropriate pair
             info[0] = 1
-            return (P,L,U,Q,info)            
-        
+            raise SingularError(1)           
+        if (max_det == 0.0):
+            info[0] = 2
+            raise SingularError(2) 
+            
         loc_point = np.rot90(U[Urow[row_n:row_n + ndim]][:,Ucol[j:]],1,(1,0))
         piv,_ = maxvol(loc_point)
+        #piv = test_pivs
         piv.sort()
-        
+     
         ### Interchanging columns due to place ones forming maxvol submatrix into the upper left position
         indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
  
