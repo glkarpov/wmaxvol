@@ -168,7 +168,7 @@ def change_intersept(inew, iold, full=True):
     union = np.array(list( set(inew) | set(iold) ))
     idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
     idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
-    return  idx_n, idx_o
+    return  idx_n.astype(int), idx_o.astype(int)
 
 @jit
 def det_search(A, ndim,start_ind1, start_ind2,black_list):
@@ -205,17 +205,13 @@ def pluq_ids(A, nder = 1, debug = False):
     
             
                 
-    n, m = A.shape[0], A.shape[1]
-    P = np.arange(n)
+    n, m = A.shape
+    P, Q = np.arange(n), np.arange(m)
     L = np.eye(n, m, dtype=A.dtype)
     U = np.copy(A)
-    Q = np.arange(m)
     ndim = nder + 1
-    global unit
-    yx = np.array([0, 0], dtype=int)
     black_list = []
     info = np.zeros((2), dtype=int)
-    treshold = 1e-10
     j = 0
     while (j < m):
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
@@ -300,4 +296,88 @@ def pluq_ids(A, nder = 1, debug = False):
 
       
     P_pr = p_preproc(P, ndim)
-    return(P_pr,L,U,Q,info)  
+    return(P_pr,L,U,Q,info) 
+#--------------------------------------------------------------
+@jit
+def det_search_index(A,Arow, Acol, ndim,start_ind1, start_ind2):
+    det = 0.0
+    row = start_ind1 
+    final_piv = np.zeros(ndim)
+    for k in range(start_ind1,A.shape[0],ndim):
+          
+        pair = np.rot90(A[Arow[k:k + ndim]][:,Acol[start_ind2:]],1,(1,0))
+        rank = np.linalg.matrix_rank(pair)
+
+        if rank == ndim :
+            loc_piv,_ = maxvol(pair)
+            if np.abs(np.linalg.det(pair[loc_piv])) > det:
+                det, row = np.abs(np.linalg.det(pair[loc_piv])), k
+                
+    return(det, row)
+
+
+def pluq_ids_index(A, nder, debug = False):  
+   
+    n, m = A.shape[0],A.shape[1]
+    P, Q = np.arange(n), np.arange(m)
+    L = np.eye(n, m, dtype=A.dtype)
+    U = np.copy(A)
+    Urow, Ucol  = np.arange(n), np.arange(m)
+    Lrow, Lcol = np.arange(n), np.arange(m)
+    ndim = nder + 1
+  
+    info = np.zeros((2), dtype=int)
+    
+    j = 0
+    while (j < m):
+        ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
+        ### 'k'- pair counter, which starts from current j position till the bottom of the matrix
+        max_det, row_n = det_search_index(U,Urow,Ucol,ndim,j,j)
+        if (max_det == 0.0) and (j == 0):
+            ### Critical error = no appropriate pair
+            info[0] = 1
+            return (P,L,U,Q,info)            
+        
+        loc_point = np.rot90(U[Urow[row_n:row_n + ndim]][:,Ucol[j:]],1,(1,0))
+        piv,_ = maxvol(loc_point)
+        piv.sort()
+        
+        ### Interchanging columns due to place ones forming maxvol submatrix into the upper left position
+        indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
+ 
+        Ucol[indx_n] = Ucol[indx_o]
+        Lcol[indx_n] = Lcol[indx_o]           
+        Q[indx_n] = Q[indx_o]
+
+        ### Interchanging rows
+        indx_n, indx_o = change_intersept(np.arange(ndim) + j,row_n + np.arange(ndim))
+        Urow[indx_n] = Urow[indx_o]
+        Lrow[indx_n] = Lrow[indx_o]           
+        P[indx_n] = P[indx_o]
+       
+        ### To avoid zeros on the main diagonal during the elimination process, we do local plu decomposition in the block
+        p_loc,l,rt = lu(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]])
+        p_loc  = perm_array(p_loc.T)
+
+        ### Interchanging rows inside one block according to the local plu
+        indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
+        Urow[indx_n] = Urow[indx_o]
+        Lrow[indx_n] = Lrow[indx_o]
+        P[indx_n] = P[indx_o]
+       
+        ### make them all zeros! Below (j,j) element
+        for idx in range(ndim):  
+                ind = j + idx
+                for i in range(ind+1, n):
+                    L[Lrow[i]][Lcol[ind]] = U[Urow[i]][Ucol[ind]]/U[Urow[ind]][Ucol[ind]]
+                    U[Urow[i]][Ucol[ind:]] -= L[Lrow[i]][Lcol[ind]]*U[Urow[ind]][Ucol[ind:]]
+    
+        if (debug):
+            print('after {} eliminations'.format(ndim))
+            print U
+
+        j = j + ndim
+
+      
+    P_pr = p_preproc(P, ndim)
+    return(P_pr.astype(int),L[Lrow][:,Lcol],U[Urow][:,Ucol],Q,info)  

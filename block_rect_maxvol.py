@@ -130,7 +130,7 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     assert (A.shape[0] % (nder+1) == 0)
     assert (Kmax % (nder+1) == 0)
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
-    pluq_perm,l,u,q,inf = ids.pluq_ids(A,nder, debug=False)
+    pluq_perm,l,u,q,inf = ids.pluq_ids_index(A,nder, debug=False)
     A_init = np.dot(ids.perm_matrix(pluq_perm),np.dot(A,ids.perm_matrix(q)))
     A_rect_init,_,perm = block_maxvol(A_init, nder, tol = tol,max_iters=200,swm_upd=True)
     bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm),ids.perm_matrix(pluq_perm)))
@@ -148,8 +148,8 @@ def test(A,x,x_test, nder, col_expansion, N_rows, function):
     #print la.matrix_rank(M)
     #print N_column
     
-    piv = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
-    cut_piv = piv[:N_rows]
+    pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
+    cut_piv = pivs[:N_rows]
     
     block_func_deriv = RHS(function,x)
     c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
