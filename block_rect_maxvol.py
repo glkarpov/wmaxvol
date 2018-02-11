@@ -45,7 +45,7 @@ def form_permute(C, j, ind): #  REMOVE THIS
 def mov_row(C, j, ind_x): #  REMOVE THIS
     C[[ind_x,j],:] = C[[j,ind_x],:]
 
-@jit  
+@jit
 def cold_start(C, ndim):
     n = C.shape[0]
     k = n // ndim
@@ -59,7 +59,7 @@ def cold_start(C, ndim):
 def matrix_prep(A, ndim, l):
     return A[ np.arange(l*ndim).reshape(ndim, l).flatten(order='F') , :]
 
-@jit  
+@jit
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     ndim = nder + 1
     M, n = A_init.shape
@@ -78,36 +78,16 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
     C_w = np.copy(C)
     CC_sigma = []
 
-    while (Fl == True) and (shape_index < Kmax):
+    while Fl and (shape_index < Kmax):
 
-        if (Fl_cs == False):
-            ind_array = la.det(np.eye(ndim) + CC_sigma)
-            elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
-            #print elem
-            if (ind_array[elem] > 1 + t):
-                CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
-                for idx in range(ndim):
-                    form_permute(P,shape_index + idx,elem*ndim + idx)
-                    mov_row(C_w,shape_index + idx,elem*ndim + idx)
-                C_new, line = rect_core(C_w,C_w[shape_index:shape_index + ndim],ndim)
-                #print C_new.shape, C_w.shape
-
-                ### update list of CC_sigma
-                for k in range(block_n):
-                    CC_sigma[k] = CC_sigma[k] - lining(C_w[k*ndim:ndim*(k+1)],line,inv=True).assemble()
-                C_w = C_new
-                shape_index += ndim
-            else:
-                print ('elements not found')
-                Fl = False
-                
+        shape_index_unit = shape_index // ndim
         if Fl_cs:
             CC_sigma = cold_start(C_w, ndim)
             ind_array = la.det(np.eye(ndim) + CC_sigma)
-            elem = np.argmax(np.abs(ind_array[(shape_index // ndim):])) + (shape_index // ndim)
+            elem = np.argmax(np.abs(ind_array[shape_index_unit:])) + shape_index_unit
             #print elem
             if (ind_array[elem] > 1 + t):
-                CC_sigma[shape_index/ndim], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index/ndim]
+                CC_sigma[shape_index_unit], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index_unit]
                 for idx in range(ndim):
                     form_permute(P,shape_index + idx,elem*ndim + idx)
                     mov_row(C_w,shape_index + idx,elem*ndim + idx)
@@ -116,16 +96,42 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
                 Fl = False
             shape_index += ndim
             C_new, line = rect_core(C_w,C_w[n:shape_index],ndim)
-            
+
             ### update list of CC_sigma
             for k in range(block_n):
                 CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].conjugate().T))
             C_w = C_new 
             Fl_cs = False
-            
+
+
+        else:
+            ind_array = la.det(np.eye(ndim) + CC_sigma)
+            elem = np.argmax(np.abs(ind_array[shape_index_unit:])) + shape_index_unit
+            #print elem
+            if (ind_array[elem] > 1 + t):
+                CC_sigma[shape_index_unit], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index_unit]
+                for idx in range(ndim):
+                    form_permute(P, shape_index + idx, elem*ndim + idx)
+                    mov_row(C_w, shape_index + idx, elem*ndim + idx)
+                C_new, line = rect_core(C_w, C_w[shape_index:shape_index + ndim], ndim)
+                #print C_new.shape, C_w.shape
+
+                ### update list of CC_sigma
+                for k in range(block_n):
+                    CC_sigma[k] = CC_sigma[k] - lining(C_w[k*ndim:ndim*(k+1)], line, inv=True).assemble()
+                C_w = C_new
+                shape_index += ndim
+            else:
+                print ('elements not found')
+                Fl = False
+
+
 
     return (C_w, CC_sigma, P)
-@jit    
+
+
+
+@jit
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
     assert (A.shape[1] % (nder+1) == 0)
     assert (A.shape[0] % (nder+1) == 0)
@@ -143,52 +149,79 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     else:
         return (final_perm)
 
-def test(A,x,x_test, nder, col_expansion, N_rows, function):
+def test(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
     N_column = col_expansion*(nder+1)
     M = A[:, :N_column]
     #print la.matrix_rank(M)
     #print N_column
     
-    pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
+    if to_save_pivs:
+        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
+        test.pivs = pivs
+        test.N_column = N_column
+    else:
+        try:
+            pivs = test.pivs
+            assert test.N_column == N_column, "Call test with to_save_pivs=True first"
+        except:
+            assert False, "Call test with to_save_pivs=True first"
+
+    assert pivs.size >= N_rows, "Wrong N_rows value"
     cut_piv = pivs[:N_rows]
+    taken_indices = cut_piv[::(nder+1)] // (nder+1)
+
+    if type(functions) is not list:
+        functions = [functions]
+
+    error = np.empty(len(functions), dtype=float)
+
+    for i, function in enumerate(functions):
+        block_func_deriv = RHS(function, x[taken_indices])
+        c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv], block_func_deriv)
     
-    block_func_deriv = RHS(function,x)
-    c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv],block_func_deriv[cut_piv])
+        approx_calcul = approximant(nder, c_block, poly=poly)
+        error[i] = error_est(function, approx_calcul, x_test)
     
-    taken_indices = cut_piv[::(nder+1)]/(nder+1)
-    approx_calcul = approximant(nder,c_block)
-    error = error_est(function, approx_calcul, x_test)
-    
-    '''
-    l_bound = np.amin(x)
-    u_bound = np.amax(x)
-    plt.xlim(l_bound-0.15, u_bound+0.15)
-    plt.ylim(l_bound-0.15, u_bound+0.15)
-    plt.plot(taken_p[:,0],taken_p[:,1], 'b^')
-    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=2, borderaxespad=0.)
-    plt.title("E = {}".format(error))
-    plt.grid(True)
-    fn = 'func={}_d={}_num={}_nder={}.pdf'.format(function.__name__, N_column, N_rows, nder)
-    plt.savefig(fn)
-    '''
+    if nder == 2 and (fnpdf is not None or to_export_pdf):
+        l_bound = np.amin(x, 0)
+        u_bound = np.amax(x, 0)
+        delta = (u_bound - l_bound)/20.0
+        fig = plt.figure()
+        plt.xlim(l_bound[0] - delta[0], u_bound[0] + delta[0])
+        plt.ylim(l_bound[1] - delta[1], u_bound[1] + delta[1])
+        plt.plot(x[taken_indices, 0], x[taken_indices, 1], 'b^')
+        # plt.title("E = {}".format(error))
+        plt.grid(True)
+        if fnpdf is None:
+            # fnpdf = 'func={}_columns={}_rows={}_pnts={}.pdf'.format(function.__name__, N_column, N_rows, len(taken_indices))
+            fnpdf = 'columns={}_rows={}.pdf'.format(N_column, N_rows)
+        # print "Num of points = {}, saving to file {}".format(len(taken_indices), fnpdf)
+        plt.savefig(fnpdf)
+        plt.close(fig)
+
     return error, taken_indices
 
-def approximant(nder, coef):
+def approximant(nder, coef, poly=cheb):
     # components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
     components = SymbVars(nder)
-    sym_monoms = GenMat(coef.shape[0], np.array([components]), poly=cheb, debug=False, pow_p=1, ToGenDiff=False)
+    sym_monoms = GenMat(coef.shape[0], np.array([components]), poly=poly, debug=False, pow_p=1, ToGenDiff=False)
     evaluate = np.dot(sym_monoms[0], coef)
     evaluate = simplify(evaluate)
     res = utilities.lambdify(components, evaluate, 'numpy')
     return res
 
 def test_points_gen(n_test, nder, distrib = 'random'):
+    """
     if distrib == 'random' :
         x_test = 2*np.random.rand(n_test, nder) - 1
     if distrib == 'LHS' :
         x_test = lhs(nder, samples=n_test)
     return x_test
-     
+    """
+    return {'random' : lambda n_test, nder : 2*np.random.rand(n_test, nder) - 1,
+            'LHS'    : lambda n_test, nder : lhs(nder, samples=n_test)          }[distrib](n_test, nder)
+
+
 def error_est(origin_func, approx, points):
     error = la.norm(origin_func(*points.T) - approx(*points.T), np.inf) / la.norm(origin_func(*points.T), np.inf)
     return error
@@ -247,18 +280,6 @@ quadro_3.diff = MakeDiffs(quadro_3, 3, True)
 def RHS(function, points):
     """
     Form RH-side from function and its derivative
-    """
-
-    """
-    old realization
-    func = function(*points.T)
-    func_diff = [function.diff[i](*points.T) for i in range(len(function.diff))]
-    block_rhs = np.zeros((nder+1)*(points.shape[0]))
-    for i in range(points.shape[0]):
-        block_rhs[i*(nder+1)] = func[i]
-        for j in range(nder):
-            block_rhs[i*(nder+1)+j+1] = func_diff[j][i]
-
     """
 
     nder= points.shape[1]

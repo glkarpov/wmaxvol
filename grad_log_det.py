@@ -55,7 +55,7 @@ def grad(points):
     # key part of analytical calculation
     # here is implemented analytical formula (for multidimensional case)
     grad = np.empty(tot_elems, dtype = np.float64)
-    A = gen.GenMat(num_col, points, poly = gen.cheb, poly_diff = gen.cheb_diff, ToGenDiff=False)
+    A = gen.GenMat(num_col, points, poly = gen.cheb, ToGenDiff=False)
     B_inv = LA.inv(np.dot(A.conj().T, A))
     for k in range(tot_elems):
         col = k//num_of_points
@@ -69,7 +69,7 @@ def grad(points):
 # this is stable calculation of objective function to minimize -log(det(A.T*A)) 
 def loss_func(points):
     points = points.reshape(points.size // dim, dim, order='F')
-    A = gen.GenMat(num_col, points, poly = gen.cheb, poly_diff = gen.cheb_diff, ToGenDiff=False)
+    A = gen.GenMat(num_col, points, poly = gen.cheb, ToGenDiff=False)
     S = LA.svd(A, compute_uv = False)
     ld = 2.0*np.sum(np.log(S))
     return -ld
