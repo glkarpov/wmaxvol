@@ -8,7 +8,15 @@ from sympy import *
 from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
 from numba import jit
+import sys
 
+# jit = lambda x : x
+to_print_progress = False
+
+def DebugPrint(s):
+    if to_print_progress:
+        print s
+        sys.stdout.flush()
 
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
 class lining:
@@ -131,19 +139,32 @@ def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
 
 
 
-@jit
+# @jit
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
     assert (A.shape[1] % (nder+1) == 0)
     assert (A.shape[0] % (nder+1) == 0)
     assert (Kmax % (nder+1) == 0)
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
-    pluq_perm,l,u,q,inf = ids.pluq_ids_index(A,nder, debug=False)
-    A_init = np.dot(ids.perm_matrix(pluq_perm),np.dot(A,ids.perm_matrix(q)))
-    A_rect_init,_,perm = block_maxvol(A_init, nder, tol = tol,max_iters=200,swm_upd=True)
-    bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm),ids.perm_matrix(pluq_perm)))
-    a, b, c = rect_block_maxvol_core(A_rect_init,nder,Kmax,t = rect_tol)
-    final_perm = ids.perm_array(np.dot(ids.perm_matrix(c),ids.perm_matrix(bm_perm)))
-    
+    DebugPrint ("Start")
+
+    pluq_perm, l, u, q, inf = ids.pluq_ids_index(A, nder, debug=False)
+    DebugPrint ("ids.pluq_ids_index finishes")
+
+    # A_init = np.dot(ids.perm_matrix(pluq_perm), np.dot(A, ids.perm_matrix(q)))
+    A = A[pluq_perm][:, q]
+    DebugPrint ("block_maxvol starting")
+    A, _, perm = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
+    DebugPrint ("block_maxvol finishes")
+
+    # bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm), ids.perm_matrix(pluq_perm)))
+    bm_perm = pluq_perm[perm]
+    DebugPrint ("rect_block_maxvol_core starts")
+    a, b, c = rect_block_maxvol_core(A, nder, Kmax, t = rect_tol)
+    DebugPrint ("rect_block_maxvol_core finishes")
+
+    # final_perm = ids.perm_array(np.dot(ids.perm_matrix(c), ids.perm_matrix(bm_perm)))
+    final_perm = bm_perm[c]
+
     if ext_debug:
         return (a,b, final_perm, bm_perm, pluq_perm)
     else:
