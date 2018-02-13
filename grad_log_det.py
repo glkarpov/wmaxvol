@@ -54,7 +54,7 @@ def grad(points):
     
     # key part of analytical calculation
     # here is implemented analytical formula (for multidimensional case)
-    grad = np.empty(tot_elems, dtype = np.float64)
+    grad = np.zeros(tot_elems, dtype = np.float64)
     A = gen.GenMat(num_col, points, poly = gen.cheb, ToGenDiff=False)
     B_inv = LA.inv(np.dot(A.conj().T, A))
     for k in range(tot_elems):
