@@ -1,12 +1,23 @@
 import numpy as np
 from maxvolpy.maxvol import maxvol
-from scipy.linalg import lu as lu
-import scipy.linalg 
+from scipy.linalg import lu_factor
+import scipy.linalg
+import sys
 from numba import jit
 
+# jit = lambda x : x
+
+to_print_progress = False
+
+def DebugPrint(s):
+    if to_print_progress:
+        print s
+        sys.stdout.flush()
+
 ### how to make from permatation matrix readable array
+_="""
 def perm_array(A):
-    p_a = np.array((A.shape[0]))
+    # p_a = np.array((A.shape[0]))
     p_a = np.argmax(A, axis = 1)
     return p_a
 
@@ -21,9 +32,26 @@ def perm_matrix(p, m = 'P'):
         
     return p_m
 
+"""
+
+@jit
+def real_permute(p, sz=None):
+    if sz is None:
+        sz = max(len(p), np.max(p))
+
+    idx = np.arange(sz)
+    for i, e in enumerate(p):
+        idx[i], idx[e] = idx[e], idx[i]
+
+    # DebugPrint( "real_permute : {}<-{}, ({})".format(str(p), str(idx), sz) )
+
+    return idx
+
+_="""
 def form_permute(C, j, ind):
     C[ind],C[j]=C[j],C[ind]
     return()  
+"""
 
 def p_preproc(p,ndim):
     loc = np.copy(p)
@@ -31,14 +59,14 @@ def p_preproc(p,ndim):
         loc[j:j+ndim] = np.sort(loc[j:j+ndim])
     return(loc)
 
-@jit        
+@jit
 def elimination(L,U,ind):
     k = L.shape[0]
     for i in range(ind+1, k):
         L[i,ind] = U[i,ind]/U[ind,ind]
         U[i,ind:] -= L[i,ind]*U[ind,ind:] 
-    return ()  
-    
+    return ()
+
 def plu(A):
     n, m = A.shape
     P = np.eye((n), dtype=float)
@@ -58,7 +86,7 @@ def plu(A):
             L[i,j] = U[i,j]/U[j,j]
             U[i,j:] -= L[i,j]*U[j,j:]
            
-    return(P, L, U)       
+    return(P, L, U)
 
 # Some opt. staff
 def LU_opt(A):
@@ -159,12 +187,14 @@ def pluq(A):
             
     return(P, L, U[:m], Q) 
 
-def change_intersept(inew, iold, full=True):
+def change_intersept(inew, iold):
     """
     change two sets of rows or columns when indices may intersept with preserving order
     RETURN two sets of indices,
     than say A[idx_n] = A[idx_o]
     """
+
+    # DebugPrint(str(inew) + '<->' + str(iold))
     union = np.array(list( set(inew) | set(iold) ))
     idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
     idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
@@ -265,9 +295,13 @@ def pluq_ids(A, nder = 1, debug = False):
         if (debug):
             if np.linalg.det(block) == max_det:
                 print('correct 2x2 matrix')
-        p_loc,l,rt = lu(block)
 
-        p_loc  = perm_array(p_loc.T)
+        # p_loc, l, rt = lu(block)
+        # p_loc  = perm_array(p_loc.T)
+
+        _, p_loc = lu_factor(block, overwrite_a=True, check_finite=False)
+        p_loc = real_permute(p_loc, ndim)
+
 
         #print p_loc,np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc]
         indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
@@ -366,8 +400,10 @@ def pluq_ids_index(A, nder, debug = False):
         P[indx_n] = P[indx_o]
        
         ### To avoid zeros on the main diagonal during the elimination process, we do local plu decomposition in the block
-        p_loc,l,rt = lu(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]])
-        p_loc  = perm_array(p_loc.T)
+        # p_loc,l,rt = lu(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]])
+        # p_loc  = perm_array(p_loc.T)
+        _, p_loc = lu_factor(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]], overwrite_a=True, check_finite=False)
+        p_loc = real_permute(p_loc, ndim)
 
         ### Interchanging rows inside one block according to the local plu
         indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
