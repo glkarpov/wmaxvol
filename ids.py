@@ -5,7 +5,7 @@ import scipy.linalg
 import sys
 from numba import jit
 
-# jit = lambda x : x
+jit = lambda x : x
 
 to_print_progress = False
 
@@ -53,11 +53,11 @@ def form_permute(C, j, ind):
     return()  
 """
 
-def p_preproc(p,ndim):
-    loc = np.copy(p)
-    for j in range(0,len(loc),ndim):
-        loc[j:j+ndim] = np.sort(loc[j:j+ndim])
-    return(loc)
+def p_preproc(p, ndim, overwrite_a=False):
+    loc = p if overwrite_a else np.copy(p)
+    for j in range(0, len(loc), ndim):
+        loc[j:j+ndim].sort()
+    return loc
 
 @jit
 def elimination(L,U,ind):
@@ -105,8 +105,8 @@ def LU_opt(A):
 
     return p, LU
 
-
-def MakeLU(p, LU):
+@jit
+def MakeLU_P(p, LU):
     n = p.size
     L = np.zeros_like(LU)
     U = np.zeros_like(LU)
@@ -122,6 +122,11 @@ def MakeLU(p, LU):
                     L[i, j] = LU[p_i, j]
 
     return np.eye(n, dtype=int)[p], L, U
+
+def MakeLU(LU):
+    L = np.tril(LU, -1)
+    np.fill_diagonal(L, 1.0)
+    return L, np.triu(LU[:LU.shape[1]])
 
 # ---------------------------------------------------------
 
@@ -196,29 +201,30 @@ def change_intersept(inew, iold):
 
     # DebugPrint(str(inew) + '<->' + str(iold))
     union = np.array(list( set(inew) | set(iold) ))
-    idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
-    idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
+    idx_n = np.hstack((inew, np.setdiff1d(union, inew, assume_unique=True)))
+    idx_o = np.hstack((iold, np.setdiff1d(union, iold, assume_unique=True)))
     return  idx_n.astype(int), idx_o.astype(int)
 
 @jit
-def det_search(A, ndim,start_ind1, start_ind2,black_list):
+def det_search(A, ndim, start_ind1, start_ind2, black_list):
         det = 0.0
-        row = start_ind1 
+        row = start_ind1
 
-        for k in range(start_ind1,A.shape[0],ndim):
+        for k in range(start_ind1, A.shape[0], ndim):
             if k not in black_list:
                 #pair = A[k:k+ndim][:,start_ind2:].T
-                pair = np.rot90(A[k:k + ndim][:,start_ind2:],1,(1,0))
+                pair = np.rot90(A[k:k + ndim][:,start_ind2:], 1, (1,0))
                 ra = np.linalg.matrix_rank(pair)
 
                 if ra == ndim :
-                    piv,_ = maxvol(pair)
-                    if np.abs(np.linalg.det(pair[piv])) > det:
-                        det, row = np.abs(np.linalg.det(pair[piv])), k
+                    piv, _ = maxvol(pair)
+                    cur_det = np.abs(np.linalg.det(pair[piv]))
+                    if cur_det > det:
+                        det, row = cur_det, k
                 
         return(det, row)
 
-def pluq_ids(A, nder = 1, debug = False):  
+def pluq_ids_old(A, nder = 1, debug = False):  
     
     def restore_lu(L,U,ind):
         k = L.shape[0]
@@ -281,13 +287,13 @@ def pluq_ids(A, nder = 1, debug = False):
         #print piv + j,np.arange(ndim) + j
         indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
         U[:,indx_n] = U[:,indx_o]
-        L[:j,indx_n] = L[:j,indx_o]           
+        L[:j,indx_n] = L[:j,indx_o]
         Q[indx_n] = Q[indx_o]
 
         indx_n, indx_o = change_intersept(np.arange(ndim) + j,row_n + np.arange(ndim))
                 
         U[indx_n,:] = U[indx_o,:]
-        L[indx_n,:j] = L[indx_o,:j]           
+        L[indx_n,:j] = L[indx_o,:j]
         P[indx_n] = P[indx_o]
 
         block = np.copy(U[j:j+ndim,j:j+ndim])
@@ -339,91 +345,134 @@ class SingularError(Exception):
 
 #--------------------------------------------------------------
 @jit
-def det_search_index(A,Arow, Acol, ndim,start_ind1, start_ind2):
+def det_search_index(A, Arow, Acol, ndim, start_ind1, start_ind2):
     det = 0.0
-    row = start_ind1 
-    loc_piv = np.zeros(ndim)
-    final_piv = np.zeros(ndim)
-    for k in range(start_ind1,A.shape[0],ndim):
+    row = start_ind1
+    Acol_idx = Acol[start_ind2:]
+    for k in range(start_ind1, A.shape[0], ndim):
           
-        pair = np.rot90(A[Arow[k:k + ndim]][:,Acol[start_ind2:]],1,(1,0))
+        pair = np.rot90(A[Arow[k:k + ndim]][:, Acol_idx], 1, (1,0))
         rank = np.linalg.matrix_rank(pair)
 
-        if rank == ndim :
-            loc_piv,_ = maxvol(pair)
-            if np.abs(np.linalg.det(pair[loc_piv])) > det:
-                det, row, final_piv = np.abs(np.linalg.det(pair[loc_piv])), k, loc_piv
+        if rank == ndim:
+            loc_piv, _ = maxvol(pair)
+            cur_det = np.abs(np.linalg.det(pair[loc_piv]))
+            if cur_det > det:
+                det, row, final_piv = cur_det, k, loc_piv
                 
     return(det, row)
 
 @jit
-def pluq_ids_index(A, nder, debug = False):  
-    
-    n, m = A.shape[0],A.shape[1]
+def pluq_ids(A, nder, debug = False, overwrite_a=False, preserve_order=True, small_matrix=True):
+    n, m = A.shape
     P, Q = np.arange(n), np.arange(m)
-    L = np.eye(n, m, dtype=A.dtype)
-    U = np.copy(A)
-    Urow, Ucol  = np.arange(n), np.arange(m)
-    Lrow, Lcol = np.arange(n), np.arange(m)
+    LU = A if overwrite_a else np.copy(A)
     ndim = nder + 1
-    info = np.zeros((2), dtype=int)
-    
+    info = np.zeros(2, dtype=int)
+    black_list = []
+    if small_matrix:
+        saveLU = np.empty((m//ndim - 1, n, m))
+        def restore_layer(ind):
+            # Add code here!!!
+            pass
+    else:
+        def restore_layer(ind):
+            # Add code here, but later
+            pass
+
     j = 0
-    while (j < m):
+    while j < m:
         ### in each slice we are looking for 2x2 matrix with maxvol and memorize 'k' as a number of first row 
         ### 'k'- pair counter, which starts from current j position till the bottom of the matrix
-        max_det, row_n = det_search_index(U,Urow,Ucol,ndim,j,j)
-        if (max_det == 0.0) and (j == 0):
-            ### Critical error = no appropriate pair
-            info[0] = 1
-            raise SingularError(1)           
-        if (max_det == 0.0):
-            info[0] = 2
-            raise SingularError(2) 
-            
-        loc_point = np.rot90(U[Urow[row_n:row_n + ndim]][:,Ucol[j:]],1,(1,0))
-        piv,_ = maxvol(loc_point)
-        #piv = test_pivs
+        j_ndim =  j + ndim
+        range_j_dim = np.arange(j, j_ndim)
+
+        max_det, row_n = det_search(LU, ndim, j, j, black_list)
+        if max_det == 0.0:
+            if j == 0:
+                ### Critical error = no appropriate pair
+                info[0] = 1
+            else:
+                info[0] = 2
+            raise SingularError(info[0])
+
+        # loc_point = LU[row_n:row_n + ndim][:, j:].T
+        loc_point = np.rot90(LU[row_n:row_n + ndim][:, j:], 1, (1,0))
+        piv, _ = maxvol(loc_point)
         piv.sort()
-     
+
         ### Interchanging columns due to place ones forming maxvol submatrix into the upper left position
-        indx_n, indx_o = change_intersept(np.arange(ndim) + j,piv + j)
- 
-        Ucol[indx_n] = Ucol[indx_o]
-        Lcol[indx_n] = Lcol[indx_o]           
+        indx_n, indx_o = change_intersept(range_j_dim, piv + j)
+        LU[:, indx_n] = LU[:, indx_o]
         Q[indx_n] = Q[indx_o]
 
         ### Interchanging rows
-        indx_n, indx_o = change_intersept(np.arange(ndim) + j,row_n + np.arange(ndim))
-        Urow[indx_n] = Urow[indx_o]
-        Lrow[indx_n] = Lrow[indx_o]           
-        P[indx_n] = P[indx_o]
-       
+        if j != row_n:
+            indx_n, indx_o = change_intersept(range_j_dim, np.arange(row_n, row_n + ndim ))
+            LU[indx_n] = LU[indx_o]
+            P[indx_n] = P[indx_o]
+
         ### To avoid zeros on the main diagonal during the elimination process, we do local plu decomposition in the block
-        # p_loc,l,rt = lu(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]])
-        # p_loc  = perm_array(p_loc.T)
-        _, p_loc = lu_factor(U[Urow[j:j+ndim]][:,Ucol[j:j+ndim]], overwrite_a=True, check_finite=False)
+        _, p_loc = lu_factor(LU[j:j_ndim][:,j:j_ndim], overwrite_a=False, check_finite=False)
         p_loc = real_permute(p_loc, ndim)
 
         ### Interchanging rows inside one block according to the local plu
-        indx_n, indx_o = change_intersept(np.arange(ndim)+j,(np.arange(ndim)+j)[p_loc])
-        Urow[indx_n] = Urow[indx_o]
-        Lrow[indx_n] = Lrow[indx_o]
+        indx_n, indx_o = change_intersept(range_j_dim, p_loc + j)
+        LU[indx_n] = LU[indx_o]
         P[indx_n] = P[indx_o]
-       
+
         ### make them all zeros! Below (j,j) element
-        for idx in range(ndim):  
-                ind = j + idx
+        for ind in range_j_dim:
+                alpha = 1.0/LU[ind, ind] # Less accurate but faster
                 for i in range(ind+1, n):
-                    L[Lrow[i]][Lcol[ind]] = U[Urow[i]][Ucol[ind]]/U[Urow[ind]][Ucol[ind]]
-                    U[Urow[i]][Ucol[ind:]] -= L[Lrow[i]][Lcol[ind]]*U[Urow[ind]][Ucol[ind:]]
-    
-        if (debug):
-            print('after {} eliminations'.format(ndim))
-            print U
+                    LU[i, ind]    *= alpha
+                    LU[i, ind+1:] -= LU[i, ind]*LU[ind, ind+1:]
 
-        j = j + ndim
+        if small_matrix:
+            if j < m - ndim:
+                saveLU[j//ndim, ...] = LU[...]
 
-      
-    P_pr = p_preproc(P, ndim)
-    return(P_pr.astype(int),L[Lrow][:,Lcol],U[Urow][:,Ucol],Q,info)  
+        j = j_ndim
+
+    if preserve_order:
+        p_preproc(P, ndim, overwrite_a=True)
+
+    return P, Q, LU, info
+
+
+if __name__ == '__main__':
+    try:
+        n = int(sys.argv[1])
+    except:
+        n = 5
+
+    try:
+        m = int(sys.argv[2])
+    except:
+        m = 3
+
+    try:
+        dim = int(sys.argv[3])
+    except:
+        dim = 3
+
+    m += n
+    n *= dim
+    m *= dim
+
+    while True:
+        np.random.seed(42)
+        A = np.random.randn(m, n)
+        if np.linalg.matrix_rank(A) == n:
+            break
+
+    # A = np.eye(*A.shape)
+    P, Q, LU, info = pluq_ids(A, dim-1, overwrite_a=False, preserve_order=False)
+    L, U = MakeLU(LU)
+    print "error =", np.max(np.abs( L.dot(U) - A[P][:, Q]  ))
+    print P, Q
+    # print A
+    # print L
+    # print U
+
+

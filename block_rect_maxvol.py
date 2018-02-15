@@ -56,16 +56,16 @@ def mov_row(C, j, ind_x): #  REMOVE THIS
 @jit
 def cold_start(C, ndim):
     n = C.shape[0]
-    k = n // ndim
     values = []
-    for i in range(0,k):
-        CC_T = np.dot(C[i*ndim:i*ndim+ndim], C[i*ndim:i*ndim+ndim].conjugate().T)
+    for i in range(0, n, ndim):
+        CC_T = np.dot(C[i:i + ndim], C[i:i + ndim].conjugate().T)
         values.append((CC_T))
     return values
 
 
-def matrix_prep(A, ndim, l):
-    return A[ np.arange(l*ndim).reshape(ndim, l).flatten(order='F') , :]
+def matrix_prep(A, ndim):
+    n = A.shape[0]
+    return A[ np.arange(n).reshape(ndim, n // ndim).flatten(order='F') ]
 
 @jit
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
