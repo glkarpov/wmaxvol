@@ -1,16 +1,17 @@
 #! /bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 import numpy as rnp
 import autograd.numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from numpy.polynomial.hermite import hermval
-from numpy.polynomial.chebyshev import chebval, chebder
 from numpy.polynomial import Chebyshev as T
-from numpy.polynomial import Hermite as H
+# from numpy.polynomial import Hermite as H
 from numpy.polynomial import Legendre as L
 import itertools
+from numba import jit
 # from scipy.linalg import solve_triangular, get_lapack_funcs, get_blas_funcs
 # import sympy
 # from sympy import *
@@ -23,6 +24,7 @@ xrange = range
 sqrt_pi = np.sqrt(np.pi)
 sqrt_pi2 = np.sqrt(np.pi*2)
 
+@jit
 def ReverseIdx(idx):
     """
     returns Reverse permutation
@@ -46,20 +48,22 @@ def sort_like(ar, arn):
     ar_p = [idxr[i] for i in arn]
     return np.argsort(ar_p)
 
-def change_intersept(inew, iold):
-    """
-    change two sets of rows or columns when indices may intercept with preserving order
-    RETURN two sets of indices,
-    than say A[idx_n] = A[idx_o]
-    """
-    # union = np.array(list( set(inew) | set(iold) ))
-    union = np.union1d(inew, iold)
-    idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
-    idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
-    return  idx_n, idx_o
+
+# @jit
+# def change_intersept(inew, iold):
+    # """
+    # change two sets of rows or columns when indices may intercept with preserving order
+    # RETURN two sets of indices,
+    # than say A[idx_n] = A[idx_o]
+    # """
+    # # union = np.array(list( set(inew) | set(iold) ))
+    # union = np.union1d(inew, iold)
+    # idx_n = np.hstack((inew, np.setdiff1d(union, inew)))
+    # idx_o = np.hstack((iold, np.setdiff1d(union, iold)))
+    # return  idx_n, idx_o
 
 
-# @jit('i8(i8,i8)')
+@jit('i8(i8,i8)')
 def binom_sh(p,l):
     """
     Shifted binomial:
@@ -79,7 +83,7 @@ def OnesFixed(m, n):
             res[uniq] = True
             yield res
 
-
+@jit
 def indeces_K(l, q, p=1):
     """
     returns all vectors of length l with sum of indices in power p <= q^p, starting form 0
@@ -130,7 +134,7 @@ def indeces_K_cut(l, maxn, p=1, q=1):
 
 
 # Some with polynomials
-
+@jit
 def herm_mult_many(x, xi, poly_func=None):
     """
     INPUT
@@ -159,6 +163,7 @@ def herm_mult_many(x, xi, poly_func=None):
     return res
 
 
+@jit
 def herm_mult_many_diff(x, xi, diff_var, poly_func=None):
     """
     INPUT
@@ -237,6 +242,7 @@ herm_nn.diff = herm_diff_nn
 herm_nn.snorm = herm_snorm
 
 
+@jit
 def herm(x, n):
     """
     returns H_n(x)
@@ -249,6 +255,7 @@ def herm(x, n):
     nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(rnp.math.factorial(n))) # norm
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
+@jit
 def herm_diff(x, n):
     if n <= 0:
         return 0
@@ -266,6 +273,7 @@ def herm_norm_snorm(n):
 herm.diff = herm_diff
 herm.snorm = herm_norm_snorm
 
+@jit
 def trigpoly(xin, n, interval=(-1,1)):
     """
     return sin(n x) or cos(n x)
@@ -279,6 +287,7 @@ def trigpoly(xin, n, interval=(-1,1)):
 
     return func(tpow*x)
 
+@jit
 def trigpoly_diff(xin, n, interval=(-1,1)):
     if n==0:
         return 0.0
@@ -292,6 +301,7 @@ def trigpoly_diff(xin, n, interval=(-1,1)):
 trigpoly.diff = trigpoly_diff
 
 
+@jit
 def legendre(x, n, interval=(-1.0, 1.0)):
     """
     Non-normed poly
@@ -299,6 +309,7 @@ def legendre(x, n, interval=(-1.0, 1.0)):
     xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
     return L.basis(n)(xn)
 
+@jit
 def legendre_diff(x, n, interval=(-1.0, 1.0)):
     xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
     return L.basis(n).deriv(1)(xn)
@@ -316,26 +327,33 @@ legendre.snorm = legendre_snorm
 
 # Main func
 
-def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True, IsTypeGood=True):
+@jit
+def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True, IsTypeGood=True, poly_vals=None, poly_diff_vals=None):
     """
     INPUT
         n_size — number of colomns (monoms), int
-        x — points, n2 x l numpy array (n2 is arbitrary integer, number of point, l — number of independent vars = number of derivatives  )
+        x — points, num_pnts x l numpy array (num_pnts is arbitrary integer, number of point, l — number of independent vars = number of derivatives  )
     OUTPUT 
-        n2*(l+1) x n_size matrix A, such that 
+        num_pnts*(l+1) x n_size matrix A, such that 
         a_{ij} = H_i(x_j) when i<l 
         or a_{ij}=H'_{i mod l}(x_j), where derivatives are taken on coordinate with number i//l
     """
 
     # global temp, x_temp
-    n2, l = x.shape
+    num_pnts, l = x.shape
     if poly is not None:
+        use_func = True
         if not isinstance(poly, list):
-            assert(callable(poly))
+            assert callable(poly), "poly must be either a func or a list of funcs"
             poly = [poly] * l
+    else:
+        assert poly_vals is not None, "Neither poly nor poly_vals parameter got"
+        use_func = False
+        if poly_diff_vals is None:
+            ToGenDiff = False
 
     if poly_diff is not None:
-        print """Parameter "poly_diff" is obsolete! Do not use it in func 'GenMat'"""
+        print ("""Parameter "poly_diff" is obsolete! Do not use it in func 'GenMat'""")
 
     """
     if poly_diff is not None:
@@ -345,9 +363,9 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     """
 
     if ToGenDiff:
-        nA = n2*(l+1) # all values in all points plus all values of all derivatives in all point: n2 + n2*l
+        nA = num_pnts*(l+1) # all values in all points plus all values of all derivatives in all point: num_pnts + num_pnts*l
     else:
-        nA = n2
+        nA = num_pnts
 
     ss = """<class 'autograd"""
     IsTypeGood = IsTypeGood and str(x.__class__)[:len(ss)] != ss
@@ -357,29 +375,59 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     else:
         A = []
 
+    assert IsTypeGood or not ToGenDiff or not use_func, 'Not implemented yet'
+
     if debug:
-        print('number of vars(n2) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(n2, l, n_size))
+        print('number of vars(num_pnts) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(num_pnts, l, n_size))
 
     if indeces is None:
         indeces = indeces_K_cut(l, n_size, p=pow_p)
     else:
         assert(len(indeces) == n_size)
 
-    for i, xp in enumerate(indeces):
-        if debug:
-            print ('monom #{} is {}'.format(i, xp))
-        # temp = herm_mult_many(x, xp, poly)
-        # x_temp = x
+    if use_func:
+        for i, xp in enumerate(indeces):
+            # if debug:
+                # print ('monom #{} is {}'.format(i, xp))
+            if IsTypeGood:
+                A[:num_pnts, i] = herm_mult_many(x, xp, poly)
+            else:
+                A.append(herm_mult_many(x, xp, poly))
 
-        if IsTypeGood:
-            A[0:n2, i] = herm_mult_many(x, xp, poly)
-        else:
-            A.append(herm_mult_many(x, xp, poly))
+            # TODO: Process this code with the case IsTypeGood == False
+            if ToGenDiff:
+                for dl in xrange(1, l+1):
+                    A[num_pnts*dl:num_pnts*dl+num_pnts, i] = herm_mult_many_diff(x, xp, dl-1, poly)
 
-        # TODO: Process this code with the case IsTypeGood == False
-        if ToGenDiff:
-            for dl in xrange(1, l+1):
-                A[n2*dl:n2*dl+n2, i] = herm_mult_many_diff(x, xp, dl-1, poly)
+    else: # use poly values and its derivatives
+        for i, xp in enumerate(indeces):
+            res = np.copy(poly_vals[:num_pnts, xp[0]])
+            for n in range(1, l):
+                res *= poly_vals[num_pnts*n : num_pnts*(n+1), xp[n]]
+
+            if IsTypeGood:
+                A[:num_pnts, i] = res
+            else:
+                A.append(res)
+
+            if ToGenDiff:
+                for dl in range(l): # all derivatives
+                    if 0 == dl: # it's the diff var
+                        res = poly_diff_vals[:num_pnts, xp[0]]
+                    else:
+                        res = poly_vals[:num_pnts, xp[0]]
+
+                    for n in range(1, l):
+                        if n == dl: # it's the diff var
+                            res *= poly_diff_vals[num_pnts*n : num_pnts*(n+1), xp[n]]
+                        else:
+                            res *= poly_vals[  num_pnts*n : num_pnts*(n+1), xp[n]]
+
+                    if IsTypeGood:
+                        A[num_pnts*(dl+1) : num_pnts*(dl+2), i] = res
+                    else:
+                        A.append(res)
+
 
     if not IsTypeGood:
         A = np.vstack(A).T
@@ -387,6 +435,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     return A
 
 
+@jit
 def CronProdX(wts, rng):
     """
     INPUT 
@@ -531,7 +580,5 @@ if __name__ == '__main__':
     # remove unnecessary x
     res, x = RenormXAndIdx(res, x_many)
     PlotPoints(res, x)
-
-
 
 

@@ -65,7 +65,7 @@ def cold_start(C, ndim):
 
 def matrix_prep(A, ndim):
     n = A.shape[0]
-    return A[ np.arange(n).reshape(ndim, n // ndim).flatten(order='F') ]
+    return A[ np.arange(n).reshape(ndim, n // ndim).ravel(order='F') ]
 
 @jit
 def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
