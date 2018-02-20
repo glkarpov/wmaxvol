@@ -7,7 +7,8 @@ import autograd.numpy as np
 import autograd.numpy.linalg as LA
 from numpy.polynomial import Chebyshev as T
 import gen_mat as gen
-from numba import jit
+from numba import jit, prange
+from scipy.spatial.distance import pdist
 
 """
 These two functions are accelerated (precompilled and parallelized) by using @jit decorator from numba 
@@ -41,7 +42,7 @@ def grad(points):
         grad – gradient of objective function in given points
     """
 
-    if (len(points.shape) == 1): #transform 1-D vector of points to the matrix (len(points)/n) x (n)
+    if (points.ndim == 1): #transform 1-D vector of points to the matrix (len(points)/n) x (n)
         # points = np.stack(np.split(points, dim),1)
         points = points.reshape(points.size // dim, dim, order='F')
 
@@ -52,8 +53,8 @@ def grad(points):
     tot_elems = points.size
 
     # computing values of all possible Chebyshev polinomials (and its derivatives) in the input points 
-    T_deriv = np.empty((tot_elems, max_degree + 1), dtype = np.float64) 
-    T_val = np.empty((tot_elems, max_degree + 1), dtype = np.float64) 
+    T_deriv = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
+    T_val   = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     for i in range(max_degree + 1):
         T_deriv[:, i] = T.deriv(T.basis(i))(points.ravel('F'))
         T_val[:, i] = T.basis(i)(points.ravel('F'))
@@ -66,8 +67,8 @@ def grad(points):
     A = gen.GenMat(num_col, points, poly_vals=T_val, indeces=idx,  ToGenDiff=False)
 
     B_inv = LA.inv(np.dot(A.conj().T, A))
-    grad_vec = np.zeros(tot_elems, dtype = np.float64)
-    for k in range(tot_elems):
+    grad_vec = np.zeros(tot_elems, dtype = points.dtype)
+    for k in prange(tot_elems):
         col = k//num_of_points
         row = k%num_of_points
         A_row = A[row]
@@ -81,13 +82,51 @@ def grad(points):
 
 @jit(parallel = True, nogil = True)
 # this is stable calculation of objective function to minimize -log(det(A.T*A)) 
-def loss_func(points):
+def loss_func(points, poly=gen.cheb, ToGenDiff=False):
     points = points.reshape(points.size // dim, dim, order='F')
-    A = gen.GenMat(num_col, points, poly = gen.cheb, ToGenDiff=False)
+    # poly = [poly]*dim
+    A = gen.GenMat(num_col, points, poly=poly, ToGenDiff=ToGenDiff)
     S = LA.svd(A, compute_uv = False)
     ld = 2.0*np.sum(np.log(S))
     return -ld
 
+
+@jit
+def NumOfClusters(pnts, tol=0.005, full=True):
+    """
+    if full return num of clusters, else returns just its number
+    """
+    pd = pdist(pnts)
+
+    n = pnts.shape[0]
+    clutsts = []
+    all_close = set()
+    ci = 0
+    for i in range(n-1):
+        for j in range(i+1, n):
+            if pd[ci] < tol:
+
+                all_close |= {i, j}
+                for c in clutsts:
+                    if i in c or j in c:
+                        c |= {i, j}
+                        break
+                else:
+                    clutsts.append({i, j})
+
+            ci += 1
+
+    for i in range(n):
+        if i not in all_close:
+            clutsts.append({i})
+
+    return clutsts if full else len(clutsts)
+
+
+
+
+
+# Test part -------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
     num_col = 5
@@ -96,7 +135,7 @@ if __name__ == '__main__':
 
     l_bound = -3.
     u_bound = 3.
-    
+
     np.random.seed(42)
     x_0 = l_bound + (u_bound - l_bound)*np.random.rand(num_points*dim)
 

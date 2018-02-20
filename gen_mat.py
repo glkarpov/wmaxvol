@@ -15,8 +15,11 @@ from numba import jit
 # from scipy.linalg import solve_triangular, get_lapack_funcs, get_blas_funcs
 # import sympy
 # from sympy import *
+from copy import copy, deepcopy
+
 
 xrange = range
+
 
 # Combinatorials funcs
 
@@ -39,14 +42,13 @@ def ReverseIdx(idx):
 
     return NumToIdxInv
 
+@jit
 def sort_like(ar, arn):
     """
     RETURNS idx so that
     ar == arn[idx]
     """
-    idxr = ReverseIdx(ar)
-    ar_p = [idxr[i] for i in arn]
-    return np.argsort(ar_p)
+    return np.argsort(ReverseIdx(ar)[arn])
 
 
 # @jit
@@ -339,13 +341,23 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
         or a_{ij}=H'_{i mod l}(x_j), where derivatives are taken on coordinate with number i//l
     """
 
-    # global temp, x_temp
     num_pnts, l = x.shape
+
+    ss = """<class 'autograd"""
+    IsTypeGood = IsTypeGood and str(x.__class__)[:len(ss)] != ss
+
+
+    calc_local_vals = False
     if poly is not None:
         use_func = True
         if not isinstance(poly, list):
             assert callable(poly), "poly must be either a func or a list of funcs"
-            poly = [poly] * l
+            if IsTypeGood:
+                # 'cause np.copy and deepcopy cannot handle autograd object
+                calc_local_vals = True
+            else:
+                # if not calc_local_vals:
+                poly = [poly] * l
     else:
         assert poly_vals is not None, "Neither poly nor poly_vals parameter got"
         use_func = False
@@ -362,46 +374,76 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
             poly_diff = [poly_diff] * l
     """
 
+    if indeces is None:
+        indeces = indeces_K_cut(l, n_size, p=pow_p)
+    else:
+        assert(len(indeces) == n_size)
+
+
     if ToGenDiff:
         nA = num_pnts*(l+1) # all values in all points plus all values of all derivatives in all point: num_pnts + num_pnts*l
     else:
         nA = num_pnts
 
-    ss = """<class 'autograd"""
-    IsTypeGood = IsTypeGood and str(x.__class__)[:len(ss)] != ss
 
     if IsTypeGood:
         A = np.empty((nA, n_size), dtype=x.dtype)
     else:
         A = []
 
-    assert IsTypeGood or not ToGenDiff or not use_func, 'Not implemented yet'
+    # assert IsTypeGood or not ToGenDiff or not use_func, 'Not implemented yet'
+
+
+    if calc_local_vals:
+        tot_elems = x.size
+        max_degree = np.max(indeces)
+        # poly_vals = np.empty((tot_elems, max_degree + 1), dtype = x.dtype)
+        poly_vals = []
+        for i in range(max_degree + 1):
+            poly_vals.append( poly(x.ravel('F'), i ) )
+        poly_vals = np.vstack(poly_vals).T
+        # print (type(poly_vals))
+
+        if ToGenDiff:
+            poly_diff_vals = []
+            for i in range(max_degree + 1):
+                poly_diff_vals.append( poly.diff(x.ravel('F'), i ) )
+            poly_diff_vals = np.vstack(poly_diff_vals).T
+
+        use_func = False
+
 
     if debug:
         print('number of vars(num_pnts) = {}, dim of space (number of derivatives, l) = {},  number of monoms(n_size) = {}'.format(num_pnts, l, n_size))
 
-    if indeces is None:
-        indeces = indeces_K_cut(l, n_size, p=pow_p)
-    else:
-        assert(len(indeces) == n_size)
 
-    if use_func:
+    if use_func: # call poly
         for i, xp in enumerate(indeces):
             # if debug:
                 # print ('monom #{} is {}'.format(i, xp))
+            Acol = []
             if IsTypeGood:
                 A[:num_pnts, i] = herm_mult_many(x, xp, poly)
             else:
-                A.append(herm_mult_many(x, xp, poly))
+                Acol.append(herm_mult_many(x, xp, poly))
 
-            # TODO: Process this code with the case IsTypeGood == False
             if ToGenDiff:
-                for dl in xrange(1, l+1):
-                    A[num_pnts*dl:num_pnts*dl+num_pnts, i] = herm_mult_many_diff(x, xp, dl-1, poly)
+                if IsTypeGood:
+                    for dl in xrange(1, l+1):
+                        A[num_pnts*dl:num_pnts*dl+num_pnts, i] = herm_mult_many_diff(x, xp, dl-1, poly)
+                else:
+                    for dl in xrange(1, l+1):
+                        Acol.append(herm_mult_many_diff(x, xp, dl-1, poly))
+
+                A.append(np.hstack(Acol))
+            else:
+                A.append(Acol[0])
+
 
     else: # use poly values and its derivatives
         for i, xp in enumerate(indeces):
             res = np.copy(poly_vals[:num_pnts, xp[0]])
+            # res = deepcopy(poly_vals[:num_pnts, xp[0]])
             for n in range(1, l):
                 res *= poly_vals[num_pnts*n : num_pnts*(n+1), xp[n]]
 
@@ -413,9 +455,9 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
             if ToGenDiff:
                 for dl in range(l): # all derivatives
                     if 0 == dl: # it's the diff var
-                        res = poly_diff_vals[:num_pnts, xp[0]]
+                        res = np.copy(poly_diff_vals[:num_pnts, xp[0]])
                     else:
-                        res = poly_vals[:num_pnts, xp[0]]
+                        res = np.copy(poly_vals[:num_pnts, xp[0]])
 
                     for n in range(1, l):
                         if n == dl: # it's the diff var
@@ -431,6 +473,14 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
 
     if not IsTypeGood:
         A = np.vstack(A).T
+
+    norm = False
+    if norm:
+        As = A
+        A  = []
+        for i, e in enumerate(As):
+            A.append(e/np.linalg.norm(e, 2))
+        A = np.vstack(A)
 
     return A
 
@@ -536,6 +586,22 @@ def SobolCoeffs(sol, l=2, func_norm=None, indeces=None):
 
 if __name__ == '__main__':
     print ('Test run')
+    # num_p = 4 # number of points we select from on each axis.
+    l = 2
+    num_pnts = 10
+    A_size = 5 # number of columns in matrix (numb. of monoms)
+    # x_many = np.random.rand((num_p+1)**l, l)
+    x_many = np.random.rand(num_pnts, l)
+    A  = GenMat(A_size, x_many, poly=cheb)
+    A2 = GenMat(A_size, x_many, poly=[cheb]*l)
+
+    print (A)
+    print (A2)
+    print (A-A2)
+
+    exit(0)
+
+
     from scipy.special.orthogonal import h_roots
     import rect_maxvol
 
