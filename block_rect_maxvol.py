@@ -4,11 +4,11 @@ import ids
 from ids import SingularError
 from block_maxvol import *
 from gen_mat import *
-from sympy import *
 from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
 from numba import jit
 import sys
+from test_bench import *
 
 # jit = lambda x : x
 to_print_progress = False
@@ -221,95 +221,5 @@ def test(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_sav
         plt.close(fig)
 
     return error, taken_indices
-
-def approximant(nder, coef, poly=cheb):
-    # components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(nder)]))
-    components = SymbVars(nder)
-    sym_monoms = GenMat(coef.shape[0], np.array([components]), poly=poly, debug=False, pow_p=1, ToGenDiff=False)
-    evaluate = np.dot(sym_monoms[0], coef)
-    evaluate = simplify(evaluate)
-    res = utilities.lambdify(components, evaluate, 'numpy')
-    return res
-
-def test_points_gen(n_test, nder, distrib = 'random'):
-    """
-    if distrib == 'random' :
-        x_test = 2*np.random.rand(n_test, nder) - 1
-    if distrib == 'LHS' :
-        x_test = lhs(nder, samples=n_test)
-    return x_test
-    """
-    return {'random' : lambda n_test, nder : 2*np.random.rand(n_test, nder) - 1,
-            'LHS'    : lambda n_test, nder : lhs(nder, samples=n_test)          }[distrib](n_test, nder)
-
-
-def error_est(origin_func, approx, points):
-    error = la.norm(origin_func(*points.T) - approx(*points.T), np.inf) / la.norm(origin_func(*points.T), np.inf)
-    return error
-
-### returns 2 values - function on domain, and block structured
-def gauss_sp(x,y):
-    return 2*exp(-((x**2)/2. + (y**2)/2.))
-
-def sincos_sp(x,y):
-    return (sin((x**2)/2. - (y**2)/4. + 3) * cos(2*x + 1 - exp(y)))
-
-def rosenbrock_sp(x,y):
-    return ((1 - x)**2 + 100*(y - x**2)**2)
-
-def roots_sp(x,y):
-    return (sqrt((x+2)**2 + (y+3)**2))
-
-def quadro_3(x,y,z):
-    return (2*((x**2)/2. + (y**2)/2. + (z**2)/2.))
-
-def many_dim_sp(x,y,z,a,b):
-    func = sin(x+y+z) + a*b
-    return func
-
-def linear_sp(x,y):
-    return (5*x + 2*y)
-
-# print 'Initializations'
-
-# quadro_3  = symb_to_func(quadro_3,    3, True, False, name='Quadro')
-gauss     = symb_to_func(gauss_sp,    2, True, False, name='Gauss')
-sincos    = symb_to_func(sincos_sp,    2, True, False, name='Sincos')
-rosenbrock =symb_to_func(rosenbrock_sp, 2, True, False, name='Rosenbrock')
-roots     = symb_to_func(roots_sp,    2, True, False, name='Roots')
-many_dim  = symb_to_func(many_dim_sp, 5, True, False, name='Myltivariate')
-linear    = symb_to_func(linear_sp,   2, True, False, name='Linear')
-
-# print 'Funcs Got'
-
-
-"""
-gauss.diff    = [FindDiff(gauss_sp,    2, i, False) for i in range(1,3)]
-many_dim.diff = [FindDiff(many_dim_sp, 5, i, False) for i in range(1,6)]
-linear.diff   = [FindDiff(np.vectorize(linear),      2, i, False) for i in range(1,3)]
-quadro_3.diff = [FindDiff(quadro_3,    3, i, False) for i in range(1,4)]
-"""
-
-gauss.diff  = MakeDiffs(gauss_sp, 2)
-sincos.diff  = MakeDiffs(sincos_sp, 2)
-rosenbrock.diff = MakeDiffs(rosenbrock_sp, 2)
-roots.diff    = MakeDiffs(roots_sp, 2)
-linear.diff = MakeDiffs(linear_sp, 2, True)
-many_dim.diff = MakeDiffs(many_dim_sp, 5, True)
-quadro_3.diff = MakeDiffs(quadro_3, 3, True)
-
-def RHS(function, points):
-    """
-    Form RH-side from function and its derivative
-    """
-
-    nder= points.shape[1]
-    nder1 = nder + 1
-    block_rhs = np.empty(nder1*points.shape[0], dtype=points.dtype)
-    block_rhs[::nder1] = function(*points.T)
-    for j in range(nder):
-        block_rhs[j+1::nder1] = function.diff[j](*points.T)
-
-    return block_rhs
 
 

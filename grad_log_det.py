@@ -2,13 +2,16 @@
 # coding: utf-8
 from __future__ import print_function
 
-# import numpy as np
-import autograd.numpy as np
-import autograd.numpy.linalg as LA
+import numpy as np
+import numpy.linalg as LA
+# import autograd.numpy as np
+# import autograd.numpy.linalg as LA
+
 from numpy.polynomial import Chebyshev as T
 import gen_mat as gen
 from numba import jit, prange
-from scipy.spatial.distance import pdist
+
+prange = range
 
 """
 These two functions are accelerated (precompilled and parallelized) by using @jit decorator from numba 
@@ -18,12 +21,8 @@ These two functions are accelerated (precompilled and parallelized) by using @ji
 global num_col
 global dim
 
-def PrintMat(A):
-    for i in A:
-        print (' '.join([str(j) for j in i]))
-
-@jit(parallel = True, nogil = True)
-def grad(points):
+# @jit(parallel = True, nogil = True)
+def grad(points, poly=gen.cheb):
     """
     Returns analytically calculated gradient of objective function: 
 
@@ -55,9 +54,12 @@ def grad(points):
     # computing values of all possible Chebyshev polinomials (and its derivatives) in the input points 
     T_deriv = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     T_val   = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
+    points_flat = points.ravel('F')
     for i in range(max_degree + 1):
-        T_deriv[:, i] = T.deriv(T.basis(i))(points.ravel('F'))
-        T_val[:, i] = T.basis(i)(points.ravel('F'))
+        # T_deriv[:, i] = T.deriv(T.basis(i))(points.ravel('F'))
+        # T_val[:, i] = T.basis(i)(points.ravel('F'))
+        T_deriv[:, i] = poly.diff(points_flat, i)
+        T_val[:, i]   = poly     (points_flat, i)
 
     # key part of analytical calculation
     # here is implemented analytical formula (for multidimensional case)
@@ -66,7 +68,13 @@ def grad(points):
     # else:
     A = gen.GenMat(num_col, points, poly_vals=T_val, indeces=idx,  ToGenDiff=False)
 
-    B_inv = LA.inv(np.dot(A.conj().T, A))
+    # print (num_col, points.shape)
+    try:
+        B_inv = LA.inv(A.conj().T.dot(A))
+    except: # Singular matrix
+        A[0, 0] += 1.e-1
+        B_inv = LA.inv(A.conj().T.dot(A))
+
     grad_vec = np.zeros(tot_elems, dtype = points.dtype)
     for k in prange(tot_elems):
         col = k//num_of_points
@@ -80,7 +88,7 @@ def grad(points):
 
     return -grad_vec
 
-@jit(parallel = True, nogil = True)
+# @jit(parallel = True, nogil = True)
 # this is stable calculation of objective function to minimize -log(det(A.T*A)) 
 def loss_func(points, poly=gen.cheb, ToGenDiff=False):
     points = points.reshape(points.size // dim, dim, order='F')
@@ -90,37 +98,6 @@ def loss_func(points, poly=gen.cheb, ToGenDiff=False):
     ld = 2.0*np.sum(np.log(S))
     return -ld
 
-
-@jit
-def NumOfClusters(pnts, tol=0.005, full=True):
-    """
-    if full return num of clusters, else returns just its number
-    """
-    pd = pdist(pnts)
-
-    n = pnts.shape[0]
-    clutsts = []
-    all_close = set()
-    ci = 0
-    for i in range(n-1):
-        for j in range(i+1, n):
-            if pd[ci] < tol:
-
-                all_close |= {i, j}
-                for c in clutsts:
-                    if i in c or j in c:
-                        c |= {i, j}
-                        break
-                else:
-                    clutsts.append({i, j})
-
-            ci += 1
-
-    for i in range(n):
-        if i not in all_close:
-            clutsts.append({i})
-
-    return clutsts if full else len(clutsts)
 
 
 

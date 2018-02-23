@@ -325,7 +325,7 @@ def legendre_snorm(n, interval=(-1.0, 1.0)):
 
 legendre.diff = legendre_diff
 legendre.snorm = legendre_snorm
-    
+
 
 # Main func
 
