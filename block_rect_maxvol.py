@@ -15,7 +15,7 @@ to_print_progress = False
 
 def DebugPrint(s):
     if to_print_progress:
-        print s
+        print (s)
         sys.stdout.flush()
 
 # stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.

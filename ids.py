@@ -11,7 +11,7 @@ to_print_progress = False
 
 def DebugPrint(s):
     if to_print_progress:
-        print s
+        print (s)
         sys.stdout.flush()
 
 ### how to make from permatation matrix readable array
@@ -322,7 +322,7 @@ def pluq_ids_old(A, nder = 1, debug = False):
 
         if debug == True:
             print ('just before elim')
-            print U
+            print (U)
         if (debug):
             print('Elimination starts')
         ### make them all zeros! Below (j,j) element
@@ -330,7 +330,7 @@ def pluq_ids_old(A, nder = 1, debug = False):
             elimination(L,U,j + idx)
         if (debug):
             print('after {} eliminations'.format(ndim))
-            print U
+            print (U)
 
         j = j + ndim
 
@@ -469,8 +469,8 @@ if __name__ == '__main__':
     # A = np.eye(*A.shape)
     P, Q, LU, info = pluq_ids(A, dim-1, overwrite_a=False, preserve_order=False)
     L, U = MakeLU(LU)
-    print "error =", np.max(np.abs( L.dot(U) - A[P][:, Q]  ))
-    print P, Q
+    print ("error =", np.max(np.abs( L.dot(U) - A[P][:, Q]  )))
+    print (P, Q)
     # print A
     # print L
     # print U

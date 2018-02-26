@@ -4,7 +4,7 @@
 import numpy as np
 from sympy import *
 
-
+xrange = range
 ### Main fucns
 
 def SymbVars(l, name='x'):
@@ -116,7 +116,7 @@ def To_math(s):
                 if idx is not None and idx > -1:
                     s = s[:i_old] + repl_str[i_cur_str]  + '[' + s[i+1:idx] + ']' + s[idx+1:]
                 else:
-                    print 'Bad String'
+                    print ('Bad String')
                     return s
 
             i = s.find(cur_str)
@@ -162,7 +162,7 @@ def MakeDiffs(func, d=None, to_vec=False):
         diff = [FindDiff(func, d, i+1, False) for i in range(d)]
     return diff
 
-
+_="""
 if __name__ == '__main__':
     print 'Test run'
     def f(x, y):
@@ -224,4 +224,4 @@ if __name__ == '__main__':
 
     plt.plot(xp, yp, xp, yp_diff)
     plt.show()
-
+"""
