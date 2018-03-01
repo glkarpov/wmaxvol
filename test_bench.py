@@ -161,7 +161,7 @@ def error_est(origin_func, approx, points, norm=np.inf):
 
 def test_points_gen(n_test, nder, interval=(-1.0,1.0), distrib='random'):
     return {'random' : lambda n_test, nder : (interval[1] - interval[0])*np.random.rand(n_test, nder) + interval[0],
-            'LHS'    : lambda n_test, nder : (interval[1] - interval[0])*lhs(nder, samples=n_test) + interval[0]  }[distrib](n_test, nder)
+            'LHS'    : lambda n_test, nder : (interval[1] - interval[0])*lhs(nder, samples=n_test, criterion='m', iterations=100) + interval[0]  }[distrib](n_test, nder)
 
 
 def RHS(function, points):
