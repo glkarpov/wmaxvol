@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import numpy.linalg as la
 from gen_mat import *
@@ -47,14 +48,14 @@ def PrintMat(A):
     for i in A:
         print (' '.join([str(j) for j in i]))
 
-
+# obsolete
 def LSM (points, l, func, bounds=(-1.0, 1.0), poly = gen.cheb, pow_p=1, with_diff=False):
     """
     returns inf error of LSM approximation of the func rhs in the given points with number of monoms l
     """
     A = gen.GenMat(l, points, poly = poly, pow_p=pow_p, ToGenDiff=with_diff)
     if with_diff:
-        rhs_val = RHS(func)
+        rhs_val = RHS(func, points)
     else:
         rhs_val = func(points)
 
@@ -63,7 +64,7 @@ def LSM (points, l, func, bounds=(-1.0, 1.0), poly = gen.cheb, pow_p=1, with_dif
     approx = approximant(points.shape[1], coef, poly, pow_p=pow_p, use_jit=True)
     # test = bounds[0] + (bounds[1] - bounds[0])*np.random.rand(int(1e5),points.shape[1])
     test_pnts = test_points_gen(int(1e5), points.shape[1], interval=bounds, distrib='random')
-    error = error_est(rhs, approx, test_pnts)
+    error = error_est(rhs_val, approx, test_pnts)
     return error
 
 
@@ -101,7 +102,7 @@ def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, funcs=None):
         return  maxx
 
 
-# Numpy does not like it
+# Numba does not like it
 def LebesgueConstSymb(pnts, l, poly=cheb, test_pnts=None, pow_p=1):
     A = GenMat(l, pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=False)
     dim = pnts.shape[1]
@@ -134,6 +135,7 @@ def LebesgueConstSymb(pnts, l, poly=cheb, test_pnts=None, pow_p=1):
     return maxx
 
 
+# Not used
 def approximant_list(dim, l, poly=cheb, pow_p=1, use_jit=True):
     components = SymbVars(dim)
     sym_monoms = GenMat(l, np.array([components]), poly=poly, debug=False, pow_p=pow_p, ToGenDiff=False)[0]
@@ -144,14 +146,17 @@ def approximant_list(dim, l, poly=cheb, pow_p=1, use_jit=True):
 
 
 def approximant(dim, coef, poly=cheb, pow_p=1, use_jit=True):
-    # components = symbols(' '.join(['x' + str(comp_iter) for comp_iter in xrange(dim)]))\n",
     components = SymbVars(dim)
     sym_monoms = GenMat(coef.shape[0], np.array([components]), poly=poly, debug=False, pow_p=pow_p, ToGenDiff=False)[0]
     evaluate = np.dot(sym_monoms, coef)
     evaluate = sp.simplify(evaluate)
-    res = sp.utilities.lambdify(components, evaluate, 'numpy')
+
     if use_jit:
-        res = jit(res)
+        res = jit(sp.utilities.lambdify(components, evaluate))
+    else:
+        # res = sp.utilities.lambdify(components, evaluate, 'numpy')
+        res = sp.utilities.lambdify(components, evaluate, 'numexpr')
+
     return res
 
 def error_est(origin_func, approx, points, norm=np.inf):

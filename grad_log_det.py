@@ -18,6 +18,7 @@ These two functions are accelerated (precompilled and parallelized) by using @ji
 # it is needed to know number of colums (num_col) in model matrix A and dimension (dim) of the model
 global num_col
 global dim
+tol = 1e-12
 
 @jit(parallel = True, nogil = True)
 def grad(points, poly=gen.cheb):
@@ -40,15 +41,15 @@ def grad(points, poly=gen.cheb):
     """
 
     if (points.ndim == 1 or points.shape[1] == 1): #transform 1-D vector of points to the matrix (len(points)/n) x (n)
-        points = points.reshape(points.size // dim, dim, order='F')
-    
+        points = points.reshape(-1, dim, order='F')
+
     idx = np.array(gen.indeces_K_cut(dim, num_col))
     max_degree = np.max(idx)
 
     num_of_points = points.shape[0]
     tot_elems = points.size
 
-    # computing values of all possible Chebyshev polinomials (and its derivatives) in the input points 
+    # computing values of all possible Chebyshev polynomials (and its derivatives) in the input points 
     T_deriv = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     T_val   = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     points_flat = points.ravel('F')
@@ -58,12 +59,13 @@ def grad(points, poly=gen.cheb):
 
     A = gen.GenMat(num_col, points, poly_vals=T_val, indeces=idx,  ToGenDiff=False)
 
-    _, S, V = LA.svd(A,full_matrices = False)
-    B_inv = np.dot(np.dot(V.T,np.diag(1./(S**2))),V)
-    
+    _, S, V = LA.svd(A, full_matrices = False)
+    S[ S < tol ] = tol
+    B_inv = V.T.dot(np.diag(1./(S**2))).dot(V)
+
     # key part of analytical calculation
     # here is implemented analytical formula (for multidimensional case)
-    
+
     grad_vec = np.zeros(tot_elems, dtype = points.dtype)
     for k in range(tot_elems):
         col = k//num_of_points
@@ -80,11 +82,11 @@ def grad(points, poly=gen.cheb):
 # this is stable calculation of objective function to minimize -log(det(A.T*A)) 
 def loss_func(points, poly=gen.cheb, ToGenDiff=False):
     if (points.ndim == 1 or points.shape[1] == 1):
-        points = points.reshape(points.size // dim, dim, order='F')
+        points = points.reshape(-1, dim, order='F')
     A = gen.GenMat(num_col, points, poly=poly, ToGenDiff=ToGenDiff)
     S = LA.svd(A, compute_uv = False)
-    S[S == 0.] = 1e-18
-    ld = 2.0*np.sum(np.log(S))  
+    S[ S < tol ] = tol
+    ld = 2.0*np.sum(np.log(S))
     return -ld
 
 

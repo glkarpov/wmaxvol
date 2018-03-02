@@ -1,6 +1,7 @@
 #! /bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import print_function
 import numpy as np
 from sympy import *
 
@@ -162,14 +163,13 @@ def MakeDiffs(func, d=None, to_vec=False):
         diff = [FindDiff(func, d, i+1, False) for i in range(d)]
     return diff
 
-_="""
 if __name__ == '__main__':
-    print 'Test run'
+    print ('Test run')
     def f(x, y):
         return x**6+2*y
 
     ret = export_f_txt(f, 2)
-    print "Result of export_f_txt", type(ret), ret
+    print ("Result of export_f_txt", type(ret), ret)
 
     from numpy.polynomial import Chebyshev as T
 
@@ -177,23 +177,23 @@ if __name__ == '__main__':
         return T.basis(6)(x) + y
 
     ret = export_f_txt(f2, 2)
-    print "Chebyshev poly", ret
+    print ("Chebyshev poly", ret)
 
 
     ret = export_f_Math(f2, 2)
-    print "export_f_Math", ret
+    print ("export_f_Math", ret)
 
 
-    print "Differentiation"
+    print ("Differentiation")
     def f3(x, y):
         return T.basis(3)(x) + y*y
 
 
     ret = export_f_txt(f3, 2)
-    print "Chebyshev poly", ret
+    print ("Chebyshev poly", ret)
     fdiff, fdiff_symb = FindDiff(f3, 2, 1, True)
     fdiff2, fdiff_symb2 = FindDiff(f3, 2, 2, True)
-    print fdiff_symb, "\n", fdiff_symb2
+    print (fdiff_symb, "\n", fdiff_symb2)
 
     import matplotlib.pyplot as plt
     fig = plt.figure()
@@ -206,7 +206,7 @@ if __name__ == '__main__':
 
 
     # Math functions form numpy ans sympy
-    print "-"*70
+    print ("-"*70)
 
     def f_sin(x):
         return sin(x) # Actually, its sympy.sin
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     f_sin_l, _ = symb_to_func(f_sin, 1) # Make real (numpy) func from sympy objects
 
     f_diff, f_diff_symb = FindDiff(f_sin, 1, 1, True) # U can pass either f_sin or f_sin_l here
-    print "Diff of func with sin:", f_diff_symb
+    print ("Diff of func with sin:", f_diff_symb)
 
     fig = plt.figure()
     xp = np.linspace(-np.pi, np.pi, 1000)
@@ -224,4 +224,4 @@ if __name__ == '__main__':
 
     plt.plot(xp, yp, xp, yp_diff)
     plt.show()
-"""
+

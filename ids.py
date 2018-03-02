@@ -1,9 +1,11 @@
+from __future__ import print_function
 import numpy as np
 from maxvolpy.maxvol import maxvol
 from scipy.linalg import lu_factor
 import scipy.linalg
 import sys
 from numba import jit
+
 
 jit = lambda x : x
 
