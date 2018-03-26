@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import numpy.linalg as la
 import ids
@@ -8,6 +9,7 @@ from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
 from numba import jit
 import sys
+from test_bench import *
 from test_bench import *
 
 # jit = lambda x : x
@@ -147,7 +149,8 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
     DebugPrint ("Start")
 
-    pluq_perm, l, u, q, inf = ids.pluq_ids_index(A, nder, debug=False)
+    
+    pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=True, pullbacks=40,debug=False, overwrite_a=False)
     DebugPrint ("ids.pluq_ids_index finishes")
 
     # A_init = np.dot(ids.perm_matrix(pluq_perm), np.dot(A, ids.perm_matrix(q)))
