@@ -227,7 +227,8 @@ def herm_nn(x, n):
 
 def herm_diff_nn(x, n):
     if n <= 0:
-        return 0
+        return x*0.0
+
     cf = np.zeros(n)
     cf[n-1] = 1
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)
@@ -236,8 +237,7 @@ def herm_snorm(n):
     """
     Square norm of "math" Hermite (exp(-x^2/2))
     """
-    # return (2**n)*np.math.factorial(n)*sqrt_pi
-    return rnp.math.factorial(n)*sqrt_pi2
+    return rnp.math.factorial(n)
 
 
 herm_nn.diff = herm_diff_nn
@@ -253,22 +253,17 @@ def herm(x, n):
     """
     cf = np.zeros(n+1)
     cf[n] = 1
-    #return hermval(x, cf)
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(rnp.math.factorial(n))) # norm
+    nc = np.sqrt(float(rnp.math.factorial(n))) # norm
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
 # @jit
 def herm_diff(x, n):
     if n <= 0:
-        try:
-            return np.full(x.shape, 0.0)
-        except:
-            # x is number, not array
-            return 0.0
+        return x*0.0
 
     cf = np.zeros(n)
     cf[n-1] = 1
-    nc = ((2.0*np.pi)**(0.25)) * np.sqrt(float(rnp.math.factorial(n))) # norm
+    nc = np.sqrt(float(rnp.math.factorial(n))) # norm
     return 2**(0.5*(1.0-float(n)))*n*hermval(x/np.sqrt(2.0), cf)/nc
 
 def herm_norm_snorm(n):
@@ -301,11 +296,7 @@ def trigpoly(xin, n, interval=(-1,1)):
 # @jit
 def trigpoly_diff(xin, n, interval=(-1,1)):
     if n==0:
-        try:
-            return np.full(xin.shape, 0.0)
-        except:
-            # xin is number, not array
-            return 0.0
+        return x*0.0
 
     x = np.pi*(interval[0] + interval[1] - 2.0*xin)/(interval[0] - interval[1]) # map interval to [-pi, pi]
     func = (lambda x: -np.sin(x)) if n % 2 else np.cos

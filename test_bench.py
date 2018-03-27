@@ -231,7 +231,7 @@ def halton(dim, n, start=0, bases=None):
 
     for k, i in enumerate(range(start, start + n)):
 
-        t = np.full(dim, i)
+        t = np.full(dim, i, dtype=int)
 
         prime_inv = np.copy(prime_inv_s)
         while 0 < np.sum(t):
