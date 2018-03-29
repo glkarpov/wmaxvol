@@ -398,21 +398,25 @@ def pluq_ids(A, nder, do_pullback=False, pullbacks = 10, debug = False, overwrit
                         #print ('max_det on pullback stage ', max_det)
                         if max_det == 0.0 :
                             current_layer -= 1
-                            #print (black_list)
+                            if debug:
+                                print (black_list)
                             black_list.pop()
-                            #print (black_list)
+                            if debug:
+                                print (black_list)
                             P_list.pop()
                             Q_list.pop()
                         else:
-                            black_list[current_layer].append(row_n)   
-                            #print (black_list)
+                            black_list[current_layer].append(row_n)
+                            if debug:
+                                print (black_list)
                             extra_fl = False
 
             else:
                 current_layer = j//ndim
                 black_list.append([])
                 black_list[current_layer].append(row_n)
-                #print (black_list)                
+                if debug:
+                    print (black_list)                
                 P_list.append(np.copy(P))
             
                 Q_list.append(np.copy(Q))
@@ -472,7 +476,7 @@ def pluq_ids(A, nder, do_pullback=False, pullbacks = 10, debug = False, overwrit
             elem_max =  LU[j+yx[0],j+yx[1]]
             #print elem_max
             #print LU[j-1,j-1]
-            if np.abs(elem_max/LU[j-1,j-1])>5e+01 :
+            if np.abs(elem_max/LU[j-1,j-1])>1e03 :
                 extra_fl = True
     if preserve_order:
         p_preproc(P, ndim, overwrite_a=True)

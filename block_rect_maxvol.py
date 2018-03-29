@@ -156,10 +156,11 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     # A_init = np.dot(ids.perm_matrix(pluq_perm), np.dot(A, ids.perm_matrix(q)))
     A = A[pluq_perm][:, q]
     DebugPrint ("block_maxvol starting")
-    A, _, perm = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
+    perm = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
     DebugPrint ("block_maxvol finishes")
 
     # bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm), ids.perm_matrix(pluq_perm)))
+    A = A[perm]
     bm_perm = pluq_perm[perm]
     DebugPrint ("rect_block_maxvol_core starts")
     a, b, c = rect_block_maxvol_core(A, nder, Kmax, t = rect_tol)
