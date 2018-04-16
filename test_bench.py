@@ -166,7 +166,7 @@ def error_est(origin_func, approx, points, norm=np.inf):
 
 def test_points_gen(n_test, nder, interval=(-1.0, 1.0), distrib='random', **kwargs):
     return {'random' : lambda n_test, nder : (interval[1] - interval[0])*np.random.rand(n_test, nder) + interval[0],\
-            'lhs'    : lambda n_test, nder : (interval[1] - interval[0])*lhs(nder, samples=n_test, criterion='m', iterations=100) + interval[0],\
+            'lhs'    : lambda n_test, nder : (interval[1] - interval[0])*lhs(nder, samples=n_test, **kwargs) + interval[0],\
             'halton' : lambda n_test, nder : (interval[1] - interval[0])*halton(nder, n_test, **kwargs) + interval[0],\
             'sobol'  : lambda n_test, nder : (interval[1] - interval[0])*GenSobol(nder, n_test, **kwargs) + interval[0]\
             }[distrib.lower()](n_test, nder)
