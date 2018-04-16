@@ -69,80 +69,81 @@ def matrix_prep(A, ndim):
     n = A.shape[0]
     return A[ np.arange(n).reshape(ndim, n // ndim).ravel(order='F') ]
 
+def erase_init(func, x, nder, r):
+    func.x = x
+    func.nder = nder
+    func.r = r
 @jit
-def rect_block_maxvol_core(A_init, nder, Kmax, t = 0.05):
+def point_erase(p_chosen, p, C):
+    ndim = point_erase.nder + 1
+    P = np.copy(p)
+    ### P - perm vector. [::ndim]//ndim encodes point. 
+    for point_idx in p_chosen[::(ndim)]//(ndim) :
+        erase_inx = []
+        for j in P[::(ndim)]//(ndim) :
+            if j not in p_chosen[::(ndim)]//(ndim):
+                if np.linalg.norm(point_erase.x[point_idx] - point_erase.x[j], 2) < point_erase.r:
+                    elem = np.where(P==j*ndim)[0]
+                    for idx in range(ndim):
+                        erase_inx.append(elem + idx)     
+        P=np.delete(P,erase_inx)            
+        C = np.delete(C,erase_inx,axis=0)         
+    return(P,C) 
+
+    
+@jit
+def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
     ndim = nder + 1
     M, n = A_init.shape
     block_n = M // ndim # Whole amount of blocks in matrix A
-    P = np.arange(M) # Permutation vector
+    #P = p #np.arange(M) # Permutation vector
     Fl = True
     Fl_cs = True
     ids_init = A_init[:n]
     temp_init = np.dot(A_init, np.linalg.pinv(ids_init))
-
-    A = np.copy(A_init)
-    A_hat = np.copy(ids_init)
     C = np.copy(temp_init)
 
     shape_index = n
-    C_w = np.copy(C)
     CC_sigma = []
 
     while Fl and (shape_index < Kmax):
 
-        shape_index_unit = shape_index // ndim
+        block_index = shape_index // ndim
+        
         if Fl_cs:
-            CC_sigma = cold_start(C_w, ndim)
-            ind_array = la.det(np.eye(ndim) + CC_sigma)
-            elem = np.argmax(np.abs(ind_array[shape_index_unit:])) + shape_index_unit
-            #print elem
-            if (ind_array[elem] > 1 + t):
-                CC_sigma[shape_index_unit], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index_unit]
-                for idx in range(ndim):
-                    form_permute(P,shape_index + idx,elem*ndim + idx)
-                    mov_row(C_w,shape_index + idx,elem*ndim + idx)
-            else:
-                print ('cold_start fail')
-                Fl = False
-            shape_index += ndim
-            C_new, line = rect_core(C_w,C_w[n:shape_index],ndim)
-
-            ### update list of CC_sigma
-            for k in range(block_n):
-                CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].conjugate().T))
-            C_w = C_new 
+            CC_sigma = cold_start(C, ndim)
             Fl_cs = False
 
+                
+        ind_array = la.det(np.eye(ndim) + CC_sigma)
+        elem = np.argmax(ind_array[block_index:]) + block_index
 
+        if (ind_array[elem] > 1 + t):
+            CC_sigma[block_index], CC_sigma[elem] = CC_sigma[elem], CC_sigma[block_index]
+            for idx in range(ndim):
+                form_permute(P,shape_index + idx,elem*ndim + idx)
+                mov_row(C,shape_index + idx,elem*ndim + idx)
+            C_new, line = rect_core(C,C[shape_index:shape_index+ndim],ndim)
+            if to_erase is not None:
+                ###----------------------------------
+                P, C_new = to_erase(P[shape_index:shape_index+ndim],P,C_new)
+                ###----------------------------------
+            ### update list of CC_sigma
+            #for k in range(len(CC_sigma)):
+                #CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].conjugate().T))
+            C = C_new 
+            CC_sigma = cold_start(C, ndim)    
         else:
-            ind_array = la.det(np.eye(ndim) + CC_sigma)
-            elem = np.argmax(np.abs(ind_array[shape_index_unit:])) + shape_index_unit
-            #print elem
-            if (ind_array[elem] > 1 + t):
-                CC_sigma[shape_index_unit], CC_sigma[elem] = CC_sigma[elem], CC_sigma[shape_index_unit]
-                for idx in range(ndim):
-                    form_permute(P, shape_index + idx, elem*ndim + idx)
-                    mov_row(C_w, shape_index + idx, elem*ndim + idx)
-                C_new, line = rect_core(C_w, C_w[shape_index:shape_index + ndim], ndim)
-                #print C_new.shape, C_w.shape
-
-                ### update list of CC_sigma
-                for k in range(block_n):
-                    CC_sigma[k] = CC_sigma[k] - lining(C_w[k*ndim:ndim*(k+1)], line, inv=True).assemble()
-                C_w = C_new
-                shape_index += ndim
-            else:
-                print ('elements not found')
-                Fl = False
-
-
-
-    return (C_w, CC_sigma, P)
+            print ('No relevant elements found')
+            Fl = False
+                
+        shape_index += ndim
+    return (C, CC_sigma, P)
 
 
 
 # @jit
-def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False):
+def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug = False, to_erase = None):
     assert (A.shape[1] % (nder+1) == 0)
     assert (A.shape[0] % (nder+1) == 0)
     assert (Kmax % (nder+1) == 0)
@@ -150,29 +151,27 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0, debu
     DebugPrint ("Start")
 
     
-    pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=True, pullbacks=40,debug=False, overwrite_a=False)
+    pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=False, pullbacks=40,debug=False, overwrite_a=False)
     DebugPrint ("ids.pluq_ids_index finishes")
 
-    # A_init = np.dot(ids.perm_matrix(pluq_perm), np.dot(A, ids.perm_matrix(q)))
+
     A = A[pluq_perm][:, q]
     DebugPrint ("block_maxvol starting")
     perm = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
     DebugPrint ("block_maxvol finishes")
 
-    # bm_perm = ids.perm_array(np.dot(ids.perm_matrix(perm), ids.perm_matrix(pluq_perm)))
+
     A = A[perm]
     bm_perm = pluq_perm[perm]
+    ### Perform erasure after we got initial points in square matrix
+    if to_erase is not None:
+        bm_perm, A = to_erase(bm_perm[:A.shape[1]],bm_perm,A)
+        
     DebugPrint ("rect_block_maxvol_core starts")
-    a, b, c = rect_block_maxvol_core(A, nder, Kmax, t = rect_tol)
+    a, b, c = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     DebugPrint ("rect_block_maxvol_core finishes")
-
-    # final_perm = ids.perm_array(np.dot(ids.perm_matrix(c), ids.perm_matrix(bm_perm)))
-    final_perm = bm_perm[c]
-
-    if ext_debug:
-        return (a,b, final_perm, bm_perm, pluq_perm)
-    else:
-        return (final_perm)
+    final_perm = c #bm_perm[c]
+    return (final_perm)
 
 def test(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
     N_column = col_expansion*(nder+1)
@@ -181,7 +180,8 @@ def test(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_sav
     #print N_column
     
     if to_save_pivs:
-        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, ext_debug = False)
+        erase_init(point_erase, x, nder, r = 0.15)
+        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, to_erase = point_erase)
         test.pivs = pivs
         test.N_column = N_column
     else:

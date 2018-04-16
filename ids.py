@@ -188,13 +188,9 @@ def det_search(A, ndim, start_ind, black_list):
 
         for k in range(start_ind, A.shape[0], ndim):
             if k not in black_list:
-                #pair = A[k:k+ndim].T
                 pair = np.rot90(A[k:k + ndim], 1, (1,0))
                 ra = np.linalg.matrix_rank(pair,tol= 1e-13)
                 _,s,_ = scipy.linalg.svd(pair)
-                #print pair
-                #print ra
-                #print s
 
                 if ra == ndim :
                     piv, _ = maxvol(pair)
