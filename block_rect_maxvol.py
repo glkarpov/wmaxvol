@@ -3,14 +3,9 @@ import numpy as np
 import numpy.linalg as la
 import ids
 from ids import SingularError
-from block_maxvol import *
-from gen_mat import *
-from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
 from pyDOE import *
 from numba import jit
 import sys
-from test_bench import *
-from test_bench import *
 
 # jit = lambda x : x
 to_print_progress = False
@@ -20,7 +15,39 @@ def DebugPrint(s):
         print (s)
         sys.stdout.flush()
 
-# stuff to handle with matrix linings. Puts matrix U in lining, i.e. : B = A*UA or B = AUA*.
+        
+###-------------- Service functions ----------------- ###
+
+@jit
+def form_permute(C, j, ind): #  REMOVE THIS
+    C[ind],C[j]=C[j],C[ind]
+
+@jit
+def mov_row(C, j, ind_x): #  REMOVE THIS
+    C[[ind_x,j],:] = C[[j,ind_x],:]
+
+
+def matrix_prep(A, ndim):
+    n = A.shape[0]
+    return A[ np.arange(n).reshape(ndim, n // ndim).ravel(order='F') ]
+
+# C = A\hat{A}^{-1} fast recalculation with the help of SWM formula
+@jit
+def SWM(B, ndim, i, j):
+    tmp_columns = np.copy(B[:,j:j + ndim])
+    tmp_columns[j:j + ndim] -= np.eye(ndim)
+    tmp_columns[i:i + ndim] += np.eye(ndim)
+    
+    b = B[i:i + ndim][:,j:j + ndim]
+    
+    tmp_rows = np.copy(B[i:i + ndim])
+    tmp_rows[:,j:j + ndim] -= np.eye(ndim)
+    
+    B -= np.dot(tmp_columns, np.dot(np.linalg.inv(b),tmp_rows))
+    return (B)        
+
+    
+# stuff to handle with matrix linings. Puts matrix U in the lining of A, i.e. : B = A*UA (default) or B = AUA*.
 class lining:
     def __init__(self, A, U,inv = False):
         if inv == False:
@@ -37,7 +64,7 @@ class lining:
         return np.dot(self.core, self.right)
     def assemble(self):
         return np.dot(self.left, self.right_prod())
-
+    
 # main func to form new coeff matrix
 @jit  
 def rect_core(C, C_sigma, ndim):
@@ -48,14 +75,6 @@ def rect_core(C, C_sigma, ndim):
     return C_new, puzzle.assemble()
 
 @jit
-def form_permute(C, j, ind): #  REMOVE THIS
-    C[ind],C[j]=C[j],C[ind]
-
-@jit
-def mov_row(C, j, ind_x): #  REMOVE THIS
-    C[[ind_x,j],:] = C[[j,ind_x],:]
-
-@jit
 def cold_start(C, ndim):
     n = C.shape[0]
     values = []
@@ -64,10 +83,6 @@ def cold_start(C, ndim):
         values.append((CC_T))
     return values
 
-
-def matrix_prep(A, ndim):
-    n = A.shape[0]
-    return A[ np.arange(n).reshape(ndim, n // ndim).ravel(order='F') ]
 
 def erase_init(func, x, nder, r):
     func.x = x
@@ -90,7 +105,66 @@ def point_erase(p_chosen, p, C):
         C = np.delete(C,erase_inx,axis=0)         
     return(P,C) 
 
-    
+
+### -------------- Core algorithm functions -------------- ###
+@jit
+def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd = True, debug = False):
+    n,m = A_init.shape
+    ndim = nder + 1 
+    if swm_upd:
+        A = A_init
+        ids = A_init[:m]
+        B = np.dot(A_init,np.linalg.inv(ids))
+    else:
+        A = np.copy(A_init)
+        ids = A[:m]
+        B = np.dot(A,np.linalg.inv(ids))
+                                    
+    curr_det = np.abs(np.linalg.det(ids))
+    Fl = True
+    P = np.arange(n)
+    index = np.zeros((2), dtype = int)
+    iters = 0
+
+    while Fl and (iters < max_iters) :
+        max_det = 1.0
+        for k in range(m,n,ndim):
+                pair = B[k:k+ndim]
+                for j in range(0,m,ndim):
+                    curr_det = np.abs(np.linalg.det(pair[:,j:j+ndim]))
+                    if curr_det > max_det :
+                        max_det = curr_det
+                        index[0] = k
+                        index[1] = j
+
+        if (max_det) > (1 + tol):
+            #Forming new permutation array
+            for idx in range(ndim):                          
+                form_permute(P,index[1] + idx,index[0] + idx)
+            
+            if debug == True:
+                print (P[:m])
+            if (swm_upd == True) and (debug == True): 
+                print('on the {} iteration with swm, pair {} {} chosen and pair{}'.format(iters,index[0],index[1],B[index[0]:index[0]+ndim][:,index[1]:index[1]+ndim]))
+            if (swm_upd == False) and (debug == True):
+                print('on the {} iteration with stan.oper, pair {} {} chosen and pair{}'.format(iters,index[0],index[1],B[index[0]:index[0]+ndim][:,index[1]:index[1]+ndim]))
+            ### Recalculating with new rows position
+            if swm_upd == True:
+                B = SWM(B,ndim,index[0],index[1])
+                #for idx in range(ndim):                      
+                    #mov_row(A,index[1] + idx,index[0] + idx)
+                
+            else:    
+                for idx in range(ndim):                      
+                    mov_row(A,index[1] + idx,index[0] + idx)     
+                B = np.dot(A,np.linalg.inv(ids))           
+
+            iters += 1
+        else:
+            Fl = False 
+    return (P)   
+
+
 @jit
 def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
     ndim = nder + 1
@@ -168,62 +242,6 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
         bm_perm, A = to_erase(bm_perm[:A.shape[1]],bm_perm,A)
         
     DebugPrint ("rect_block_maxvol_core starts")
-    a, b, c = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
+    a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     DebugPrint ("rect_block_maxvol_core finishes")
-    final_perm = c #bm_perm[c]
     return (final_perm)
-
-def test(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
-    N_column = col_expansion*(nder+1)
-    M = A[:, :N_column]
-    #print la.matrix_rank(M)
-    #print N_column
-    
-    if to_save_pivs:
-        erase_init(point_erase, x, nder, r = 0.15)
-        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, to_erase = point_erase)
-        test.pivs = pivs
-        test.N_column = N_column
-    else:
-        try:
-            pivs = test.pivs
-            assert test.N_column == N_column, "Call test with to_save_pivs=True first"
-        except:
-            assert False, "Call test with to_save_pivs=True first"
-
-    assert pivs.size >= N_rows, "Wrong N_rows value"
-    cut_piv = pivs[:N_rows]
-    taken_indices = cut_piv[::(nder+1)] // (nder+1)
-
-    if type(functions) is not list:
-        functions = [functions]
-
-    error = np.empty(len(functions), dtype=float)
-
-    for i, function in enumerate(functions):
-        block_func_deriv = RHS(function, x[taken_indices])
-        c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv], block_func_deriv)
-    
-        approx_calcul = approximant(nder, c_block, poly=poly)
-        error[i] = error_est(function, approx_calcul, x_test)
-    
-    if nder == 2 and (fnpdf is not None or to_export_pdf):
-        l_bound = np.amin(x, 0)
-        u_bound = np.amax(x, 0)
-        delta = (u_bound - l_bound)/20.0
-        fig = plt.figure()
-        plt.xlim(l_bound[0] - delta[0], u_bound[0] + delta[0])
-        plt.ylim(l_bound[1] - delta[1], u_bound[1] + delta[1])
-        plt.plot(x[taken_indices, 0], x[taken_indices, 1], 'b^')
-        # plt.title("E = {}".format(error))
-        plt.grid(True)
-        if fnpdf is None:
-            # fnpdf = 'func={}_columns={}_rows={}_pnts={}.pdf'.format(function.__name__, N_column, N_rows, len(taken_indices))
-            fnpdf = 'columns={}_rows={}.pdf'.format(N_column, N_rows)
-        # print "Num of points = {}, saving to file {}".format(len(taken_indices), fnpdf)
-        plt.savefig(fnpdf)
-        plt.close(fig)
-
-    return error, taken_indices
-
-

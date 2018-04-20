@@ -10,6 +10,7 @@ from numba import jit
 import gen_mat as gen
 from scipy.spatial.distance import pdist
 from sobol_lib import *
+from block_rect_maxvol import *
 
 @jit
 def NumOfClusters(pnts, tol=0.005, full=True):
@@ -469,3 +470,57 @@ def Primes(n):
         a = np.append(a, NextPrime(a))
 
     return a
+
+
+def test_bm(A, x, x_test, nder, col_expansion, N_rows, functions, poly=cheb, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
+    N_column = col_expansion*(nder+1)
+    M = A[:, :N_column]
+    #print la.matrix_rank(M)
+    #print N_column
+    
+    if to_save_pivs:
+        erase_init(point_erase, x, nder, r = 0.15)
+        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, to_erase = point_erase)
+        test.pivs = pivs
+        test.N_column = N_column
+    else:
+        try:
+            pivs = test.pivs
+            assert test.N_column == N_column, "Call test with to_save_pivs=True first"
+        except:
+            assert False, "Call test with to_save_pivs=True first"
+
+    assert pivs.size >= N_rows, "Wrong N_rows value"
+    cut_piv = pivs[:N_rows]
+    taken_indices = cut_piv[::(nder+1)] // (nder+1)
+
+    if type(functions) is not list:
+        functions = [functions]
+
+    error = np.empty(len(functions), dtype=float)
+
+    for i, function in enumerate(functions):
+        block_func_deriv = RHS(function, x[taken_indices])
+        c_block, res_x, rank, s = np.linalg.lstsq(M[cut_piv], block_func_deriv)
+    
+        approx_calcul = approximant(nder, c_block, poly=poly)
+        error[i] = error_est(function, approx_calcul, x_test)
+    
+    if nder == 2 and (fnpdf is not None or to_export_pdf):
+        l_bound = np.amin(x, 0)
+        u_bound = np.amax(x, 0)
+        delta = (u_bound - l_bound)/20.0
+        fig = plt.figure()
+        plt.xlim(l_bound[0] - delta[0], u_bound[0] + delta[0])
+        plt.ylim(l_bound[1] - delta[1], u_bound[1] + delta[1])
+        plt.plot(x[taken_indices, 0], x[taken_indices, 1], 'b^')
+        # plt.title("E = {}".format(error))
+        plt.grid(True)
+        if fnpdf is None:
+            # fnpdf = 'func={}_columns={}_rows={}_pnts={}.pdf'.format(function.__name__, N_column, N_rows, len(taken_indices))
+            fnpdf = 'columns={}_rows={}.pdf'.format(N_column, N_rows)
+        # print "Num of points = {}, saving to file {}".format(len(taken_indices), fnpdf)
+        plt.savefig(fnpdf)
+        plt.close(fig)
+
+    return error, taken_indices
