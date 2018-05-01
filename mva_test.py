@@ -79,11 +79,14 @@ def MakeValsAndNorms(funcs, pnts):
     return res
 
 # @jit
-def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, funcs=None):
-    A = GenMat(l, pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=False)
-    dim = pnts.shape[1]
+def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, funcs=None, derivative = True):
+    A = GenMat(l, pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=derivative)
+    
+    nder = pnts.shape[1]
+    if derivative:
+        A = matrix_prep(A, nder+1)
     if test_pnts is None:
-        test_pnts = test_points_gen(int(1e5), dim)
+        test_pnts = test_points_gen(int(1e5), nder)
 
     ABig = GenMat(l, test_pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=False)
     # F = A.dot(np.linalg.solve(A.T.dot(A), ABig.T)) # Slower
@@ -96,7 +99,8 @@ def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, funcs=None):
         rs = 0
         for f, fvals, fnorm in funcs:
             rs += 1
-            res[rs] = np.linalg.norm(F.T.dot(f(*pnts.T)) - fvals, np.inf)/fnorm
+            rhs = RHS(f, pnts, derivative = derivative)
+            res[rs] = np.linalg.norm(F.T.dot(rhs) - fvals, np.inf)/fnorm
 
         return res
     else:
@@ -173,19 +177,21 @@ def test_points_gen(n_test, nder, interval=(-1.0, 1.0), distrib='random', **kwar
             }[distrib.lower()](n_test, nder)
 
 
-def RHS(function, points):
+def RHS(function, points, derivative = True):
     """
     Form RH-side from function and its derivative
     """
-
     nder = points.shape[1]
-    nder1 = nder + 1
-    block_rhs = np.empty(nder1*points.shape[0], dtype=points.dtype)
-    block_rhs[::nder1] = function(*points.T)
-    for j in range(nder):
-        block_rhs[j+1::nder1] = function.diff[j](*points.T)
-
-    return block_rhs
+    if derivative == True:
+        ndim = nder + 1
+        rhs = np.empty(ndim*points.shape[0], dtype=points.dtype)
+        rhs[::ndim] = function(*points.T)
+        for j in range(nder):
+            rhs[j+1::ndim] = function.diff[j](*points.T)
+    else:
+        rhs = np.empty(points.shape[0], dtype=points.dtype)
+        rhs[:] = function(*points.T)
+    return rhs
 
 
 @jit
@@ -277,7 +283,15 @@ def many_dim_sp(x,y,z,a,b):
 def linear_sp(x,y):
     return (5*x + 2*y)
 
+def branin_sp(x,y):
+    a = 1
+    b = 5.1/(4*((np.pi)**2))
+    c = 5/np.pi
+    r, s, t = 6, 10, 1/(8*np.pi)
+    return (a*(y - b*(x**2) + c*x - r)**2 + s*(1 - t)*sp.cos(x) + s)
 
+def holsclaw_sp(x,y):
+    return (sp.log(1.05 + x + x**2 + x*y))
 
 f_gauss      = symb_to_func(gauss_sp,      2, True, False, name='Gauss')
 f_sincos     = symb_to_func(sincos_sp,     2, True, False, name='Sincos')
@@ -285,13 +299,16 @@ f_rosenbrock = symb_to_func(rosenbrock_sp, 2, True, False, name='Rosenbrock')
 f_roots      = symb_to_func(roots_sp,      2, True, False, name='Roots')
 f_many_dim   = symb_to_func(many_dim_sp,   5, True, False, name='Myltivariate')
 f_linear     = symb_to_func(linear_sp,     2, True, False, name='Linear')
-
+f_branin     = symb_to_func(branin_sp,     2, True, False, name='Branin')
+f_holsclaw   = symb_to_func(holsclaw_sp,   2, True, False, name='Holsclaw')
 
 f_gauss.diff      = MakeDiffs(gauss_sp, 2)
 f_sincos.diff     = MakeDiffs(sincos_sp, 2)
 f_rosenbrock.diff = MakeDiffs(rosenbrock_sp, 2)
 f_roots.diff      = MakeDiffs(roots_sp, 2)
 f_linear.diff     = MakeDiffs(linear_sp, 2, True)
+f_branin.diff     = MakeDiffs(branin_sp, 2)
+f_holsclaw.diff   = MakeDiffs(holsclaw_sp, 2)
 f_many_dim.diff   = MakeDiffs(many_dim_sp, 5, True)
 f_quadro_3.diff   = MakeDiffs(f_quadro_3, 3, True)
 
@@ -471,16 +488,16 @@ def Primes(n):
 
     return a
 
-
 def test_bm(A, x, nder, col_expansion, N_rows, cut_radius = 0.15, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
     N_column = col_expansion*(nder+1)
     M = A[:, :N_column]
-    #print la.matrix_rank(M)
-    #print N_column
-    
     if to_save_pivs:
-        erase_init(point_erase, x, nder, r = cut_radius)
-        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, to_erase = point_erase)
+        if cut_radius == None:
+            to_erase = None
+        else:    
+            erase_init(point_erase, x, nder, r = cut_radius)
+            to_erase = point_erase
+        pivs = rect_block_maxvol(M, nder, Kmax = N_rows, max_iters=100, rect_tol = 0.05, tol = 0.0, debug = False, to_erase = to_erase)
         test_bm.pivs = pivs
         test_bm.N_column = N_column
     else:

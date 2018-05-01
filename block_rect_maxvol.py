@@ -201,6 +201,7 @@ def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
             if to_erase is not None:
                 ###----------------------------------
                 P, C_new = to_erase(P[shape_index:shape_index+ndim],P,C_new)
+                #P = to_erase(P[shape_index:shape_index+ndim],P,C_new)
                 ###----------------------------------
             ### update list of CC_sigma
             #for k in range(len(CC_sigma)):
@@ -239,8 +240,10 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
     bm_perm = pluq_perm[perm]
     ### Perform erasure after we got initial points in square matrix
     if to_erase is not None:
+        #A1 = np.copy(A)
         bm_perm, A = to_erase(bm_perm[:A.shape[1]],bm_perm,A)
-        
+    #else:    
+    #    A1 = A    
     DebugPrint ("rect_block_maxvol_core starts")
     a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     DebugPrint ("rect_block_maxvol_core finishes")
