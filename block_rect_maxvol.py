@@ -82,8 +82,21 @@ def cold_start(C, ndim):
         CC_T = np.dot(C[i:i + ndim], C[i:i + ndim].conjugate().T)
         values.append((CC_T))
     return values
+### ---------- For experiments with different domains ---------------###
+def polar(x):
+    return math.hypot(x[0],x[1]),math.degrees(math.atan2(x[1],x[0]))
 
-
+def domain_erase(x, k):
+    erase_list = []
+    r0 = 0.8
+    a = 0.2
+    for i in range(x.shape[0]):
+        r,phi = polar(x[i])
+        if (r > r0 + a*math.cos(math.radians(phi)*k)):
+            erase_list.append(i)
+    x = np.delete(x,erase_list,axis=0)        
+    return (x)
+### ------------------------------------
 def erase_init(func, x, nder, r):
     func.x = x
     func.nder = nder
@@ -225,7 +238,6 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
     DebugPrint ("Start")
 
-    
     pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=False, pullbacks=40,debug=False, overwrite_a=False)
     DebugPrint ("ids.pluq_ids_index finishes")
 
