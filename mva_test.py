@@ -293,6 +293,20 @@ def branin_sp(x,y):
 def holsclaw_sp(x,y):
     return (sp.log(1.05 + x + x**2 + x*y))
 
+def piston(M,S,V_0,k,P_0,T_a,T_0):
+    M   = ((M + 1)*30)/2. + 30
+    S   = ((S + 1)*0.015)/2. + 0.005
+    V_0 = ((V_0 + 1)*0.008)/2. + 0.002
+    k   = ((k + 1)*4000)/2. + 1000
+    P_0 = ((P_0 + 1)*20000)/2. + 90000
+    T_a = ((T_a + 1)*6)/2. + 290
+    T_0 = ((T_0 + 1)*20)/2. + 340
+
+    A = P_0*S + 19.62*M - k*V_0/S
+    V = S/(2*k)*(np.sqrt(A**2 + 4*k*P_0*V_0*T_a/T_0) - A)
+    C = 2*np.pi*np.sqrt(M/(k + S**2*P_0*V_0*T_a/(T_0*V**2)))
+    return C
+
 f_gauss      = symb_to_func(gauss_sp,      2, True, False, name='Gauss')
 f_sincos     = symb_to_func(sincos_sp,     2, True, False, name='Sincos')
 f_rosenbrock = symb_to_func(rosenbrock_sp, 2, True, False, name='Rosenbrock')
