@@ -113,7 +113,7 @@ def indeces_K(l, q, p=1):
 def indeces_K_cut(l, maxn, p=1, q=1):
     """
     MAGIC FUNCTION
-    q is determines automatically
+    q is determined automatically
     """
     # q = int(float(  (maxn*np.math.factorial(l))**(1.0/float(l))  )+1)
     while binom_sh(q, l) < maxn:
@@ -132,6 +132,12 @@ def indeces_K_cut(l, maxn, p=1, q=1):
         return indeces_K_cut(l, maxn, p, q+1)
     else:
         return a[:maxn]
+
+
+def num_of_indeces_K(l, q, max_p):
+    a = indeces_K(l, q, max_p)
+    a = [el for el, _ in itertools.groupby(a)] # delete duplicates
+    return len(a)
 
 
 
@@ -159,7 +165,7 @@ def herm_mult_many(x, xi, poly_func=None):
     # for n in xrange(l):
     #    res *= poly_func[n](x[:, n], xi[n])
     res = poly_func[0](x[:, 0], xi[0])
-    for n in xrange(1,l):
+    for n in xrange(1, l):
         res *= poly_func[n](x[:, n], xi[n])
 
     return res
@@ -331,6 +337,21 @@ legendre.diff = legendre_diff
 legendre.snorm = legendre_snorm
 
 
+def MakeNormPoly(poly):
+    def f(x, n, **kwargs):
+        return poly(x, n, **kwargs)/np.sqrt( poly.snorm(n, **kwargs) )
+
+    def fdiff(x, n, **kwargs):
+        return poly.diff(x, n, **kwargs)/np.sqrt( poly.snorm(n, **kwargs) )
+
+    f.__name__ = poly.__name__ + '_normed'
+    f.diff = fdiff
+    f.snorm = lambda n : 1.0
+    return f
+
+legendre.normed = MakeNormPoly(legendre)
+
+
 # Main func
 
 @jit
@@ -490,6 +511,29 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
 
 
 @jit
+def GenFunc(coeffs, l, poly=None, poly_diff=None, debug=False, pow_p=1, ToGenDiff=False):
+    """
+    Generates a function that gives RH using given points and solution
+    coeffs -- solution of the system
+    l -- dimension
+    """
+    import sympy as sp
+    n_size = len(coeffs)
+    xs = ['x' + str(i) for i in xrange(l)]
+    vars_f = sp.symbols(' '.join(xs))
+    A_symb = GenMat(n_size, np.array([vars_f]), poly=poly,
+                poly_diff=poly_diff, debug=debug, pow_p=pow_p, ToGenDiff=ToGenDiff )
+
+    params = ','.join(xs)
+    if ToGenDiff:
+        res = [ eval( "lambda {}: {}".format(params, i.dot(coeffs)) ) for i in A_symb ]
+    else:
+        f_l = "lambda {}: {}".format(params, A_symb[0, :].dot(coeffs))
+        res = eval(f_l)
+        # print f_l
+    return res
+
+
 def CronProdX(wts, rng):
     """
     INPUT 
@@ -550,20 +594,48 @@ def PlotPoints(res, xout, fn='points', display=True):
     if display:
         plt.show()
 
-def SobolCoeffs(sol, l=2, func_norm=None, indeces=None):
+
+
+def indices_L(indices, subscript):
+    """
+    Filter indices for Sobol'
+    Typically, only 1st indices are needed, so variable subscript contains only one element
+    """
+    indices = np.array(indices, copy=False)
+    subscript = np.array(subscript, copy=False)
+    all_idx = np.arange(indices.shape[1], dtype=int)
+    other_idx = np.setdiff1d(all_idx, subscript)
+
+    def filter_func(x):
+        return (x[subscript] != 0).all() and (x[other_idx] == 0).all()
+
+    return np.array([i for i, x in enumerate(indices) if filter_func(x)])
+
+
+
+
+def SobolCoeffs(sol, l=2, func_norm=None, indices=None, subscripts=None):
     """
     Calculate Sobol' constants
+    sol -- coefficients of poly expansion
+    l -- dimension
     """
 
-    if func_norm is None:
-        func_norm = lambda n : legendre_snorm(n, interval=(-1, 1))
 
-    if indeces is None:
-        indeces = list(indeces_K_cut(l, len(sol)))
+    if func_norm  is None:
+        func_norm  = lambda n : 1.0
+    if indices    is None:
+        indices    = list(indeces_K_cut(l, len(sol)))
+    if subscripts is None:
+        subscripts = np.arange(l, dtype=int)[:, None]
 
+    idx_L =  [ indices_L(indices, subscripts[i]) for i in range(l) ]
+
+
+    # not used (now)
     def Li(i):
         resL = []
-        for nj, j in enumerate(indeces):
+        for nj, j in enumerate(indices):
             if j[i] > 0 and max(  list(j[:i]) + list(j[i+1:])  ) == 0:
                 resL.append(nj)
         return resL
@@ -572,24 +644,29 @@ def SobolCoeffs(sol, l=2, func_norm=None, indeces=None):
     denom = 0.0
     for ni, i in enumerate(sol):
         if ni > 0:
-            # denom += i*i*np.prod(  [legendre_snorm(j, interval=(rngl, rng)) for j in indeces[ni] ] )
-            denom += i*i*np.prod(  [func_norm(j) for j in indeces[ni] ] )
+            denom += i*i*np.prod(  [func_norm(j) for j in indices[ni] ] )
 
     # L_i
-    res = np.zeros(l, dtype=float)
-    for i in xrange(l):
-        nom = 0.0
-        for j in Li(i):
-            # nom += (sol[j]**2)*np.prod(  [legendre_snorm(k, interval=(rngl, rng)) for k in indeces[j] ] )
-            nom += (sol[j]**2)*np.prod(  [func_norm(k) for k in indeces[j] ] )
+    # res = np.zeros(l, dtype=float)
+    res = np.zeros(len(idx_L), dtype=float)
+    for i, idx in enumerate(idx_L):
+        # nom = 0.0
+        # for j in Li(i):
+        # for j in idx
+            # nom += (sol[j]**2)*np.prod(  [func_norm(k) for k in indices[j] ] )
 
-        res[i] = nom
+        # res[i] = nom
+        res[i] = np.sum( [(sol[j]**2)*np.prod(  [ func_norm(k) for k in indices[j] ] ) for j in idx] )
+
     return res/denom
 
 
 
 if __name__ == '__main__':
     print ('Test run')
+    print (legendre(1, 2), legendre.normed(1, 2), legendre.snorm(1))
+
+    exit(0)
     # num_p = 4 # number of points we select from on each axis.
     l = 2
     num_pnts = 10
