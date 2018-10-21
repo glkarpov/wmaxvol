@@ -49,11 +49,6 @@ def real_permute(p, sz=None):
 
     return idx
 
-_="""
-def form_permute(C, j, ind):
-    C[ind],C[j]=C[j],C[ind]
-    return()  
-"""
 
 def p_preproc(p, ndim, overwrite_a=False):
     loc = p if overwrite_a else np.copy(p)

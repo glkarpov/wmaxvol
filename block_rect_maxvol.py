@@ -6,6 +6,7 @@ from ids import SingularError
 from pyDOE import *
 from numba import jit
 import sys
+import math
 
 # jit = lambda x : x
 to_print_progress = False
@@ -17,15 +18,13 @@ def DebugPrint(s):
 
         
 ###-------------- Service functions ----------------- ###
-
 @jit
 def form_permute(C, j, ind): #  REMOVE THIS
     C[ind],C[j]=C[j],C[ind]
-
+    
 @jit
 def mov_row(C, j, ind_x): #  REMOVE THIS
-    C[[ind_x,j],:] = C[[j,ind_x],:]
-
+    C[[ind_x,j],:] = C[[j,ind_x],:]        
 
 def matrix_prep(A, ndim):
     n = A.shape[0]
@@ -82,20 +81,7 @@ def cold_start(C, ndim):
         CC_T = np.dot(C[i:i + ndim], C[i:i + ndim].conjugate().T)
         values.append((CC_T))
     return values
-### ---------- For experiments with different domains ---------------###
-def polar(x):
-    return math.hypot(x[0],x[1]),math.degrees(math.atan2(x[1],x[0]))
 
-def domain_erase(x, k):
-    erase_list = []
-    r0 = 0.8
-    a = 0.2
-    for i in range(x.shape[0]):
-        r,phi = polar(x[i])
-        if (r > r0 + a*math.cos(math.radians(phi)*k)):
-            erase_list.append(i)
-    x = np.delete(x,erase_list,axis=0)        
-    return (x)
 ### ------------------------------------
 def erase_init(func, x, nder, r):
     func.x = x
@@ -119,6 +105,9 @@ def point_erase(p_chosen, p, C):
     return(P,C) 
 
 
+
+#@jit
+#def weights_update(
 ### -------------- Core algorithm functions -------------- ###
 @jit
 def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd = True, debug = False):
@@ -214,7 +203,6 @@ def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
             if to_erase is not None:
                 ###----------------------------------
                 P, C_new = to_erase(P[shape_index:shape_index+ndim],P,C_new)
-                #P = to_erase(P[shape_index:shape_index+ndim],P,C_new)
                 ###----------------------------------
             ### update list of CC_sigma
             #for k in range(len(CC_sigma)):
