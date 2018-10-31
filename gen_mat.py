@@ -200,6 +200,22 @@ def herm_mult_many_diff(x, xi, diff_var, poly_func=None):
 
     return res
 
+# Ususal polynomials added
+def poly_power(x, n):
+    return x**n
+
+def poly_power_diff(x, n):
+    if n <= 0:
+        return x*0.0 # Also include a vector case
+
+    return n*(x**(n-1))
+
+def poly_power_snorm(n):
+    return 2.0/(2.0*n+1.0)
+
+poly_power.diff = poly_power_diff
+poly_power.snorm = poly_power_snorm
+
 # Some orthogonal polynomials
 
 def cheb(x, n):
