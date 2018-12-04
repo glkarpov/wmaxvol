@@ -44,6 +44,95 @@ def test_points_gen(n_test, nder, interval=(-1.0, 1.0), distrib='random', **kwar
             }[distrib.lower()](n_test, nder)
 
 
+### ---------- For experiments with different domains ---------------###
+def polar(x):
+    return math.hypot(x[0],x[1]),math.degrees(math.atan2(x[1],x[0]))
+
+def domain_erase(x, mod = 'electron'):
+    erase_list = []
+    if mod == 'electron':
+        r0 = 0.8
+        a = 0.2
+        k = 7
+        for i in range(x.shape[0]):
+            r,phi = polar(x[i])
+            if (r > r0 + a*math.cos(math.radians(phi)*k)):
+                erase_list.append(i) 
+    if mod == 'ellipse':
+        b = 0.2
+        e = 0.95
+        for i in range(x.shape[0]):
+            r,phi = polar(x[i])
+            if np.abs(r) > (b / np.sqrt(1-(e*np.cos(math.radians(phi)))**2)):
+                erase_list.append(i)
+    if mod == 'plane':
+        def f1(x):
+            return(np.sqrt((0.11)**2 - (x+0.89)**2)) 
+        def f2(x):
+            return(0.11)
+        def f3(x):
+            return(1.5*x + 0.56)
+        def f4(x):
+            return(0.95)
+        def f6(x):
+            return(1.1*x - 0.66)
+        def f7(x):
+            return(0.33)
+        for i in range(x.shape[0]):
+            if (x[i,0]<-0.89) and np.abs(x[i,1])>f1(x[i,0]):
+                erase_list.append(i)
+            if (x[i,0]>=-0.89) and(x[i,0]<-0.3) and np.abs(x[i,1])>=f2(x[i,0]):
+                erase_list.append(i)
+            if (x[i,0]>=-0.3) and(x[i,0]<0.26) and np.abs(x[i,1])>=f3(x[i,0]):
+                erase_list.append(i)
+            if (x[i,0]>=0.26) and(x[i,0]<0.35) and np.abs(x[i,1])>=f4(np.abs(x[i,0]))-0.02:
+                erase_list.append(i)
+            if (x[i,0]>=0.35) and(x[i,0]<0.7) and np.abs(x[i,1])>=f2(np.abs(x[i,0])):
+                erase_list.append(i)
+            if (x[i,0]>=0.7) and(x[i,0]<0.9) and np.abs(x[i,1])>=f6(np.abs(x[i,0])):
+                erase_list.append(i)
+            if (x[i,0]>=0.9) and(x[i,0]<=0.95) and np.abs(x[i,1])>=f7(np.abs(x[i,0]))-0.02:
+                erase_list.append(i)
+            if (x[i,0]>0.95):
+                erase_list.append(i)
+        
+    if mod == 'rhombus':
+        def f8(x):
+            return(2*x + 1) 
+        def f9(x):
+            return(-2*x + 1)
+        for i in range(x.shape[0]):
+            if (x[i,0]<-0.5):
+                erase_list.append(i)
+            if (x[i,0]>=-0.5) and (x[i,0]<0)   and np.abs(x[i,1])>f8(x[i,0]):
+                erase_list.append(i)
+            if (x[i,0]>= 0) and(x[i,0]<=0.5) and np.abs(x[i,1])>f9(x[i,0]):
+                erase_list.append(i)
+            if (x[i,0]>0.5):
+                erase_list.append(i)
+    x = np.delete(x,erase_list,axis=0)            
+    return (x)
+
+
+def complex_area_pnts_gen(n_test, nder, mod, distrib):
+    k = 100
+    while True:
+        if distrib == 'Sobol':
+            x_temp = GenSobol(k*n_test, nder, seed=random.randint(0,256),rng=(-1, 1))
+        else:
+            x_temp = test_points_gen(k*n_test, nder, distrib=distrib)
+        if mod is not None:    
+            x_temp = domain_erase(x_temp, mod = mod)    
+        try:
+            return x_temp[:n_test]
+        except:
+            k = int(1.5*k)
+            pass
+ 
+
+    
+    
+#-----------------------------------------------------------    
 primes = np.array([
         2,    3,    5,    7,   11,   13,   17,   19,   23,   29, \
        31,   37,   41,   43,   47,   53,   59,   61,   67,   71, \

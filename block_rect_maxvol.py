@@ -3,7 +3,7 @@ import numpy as np
 import numpy.linalg as la
 import ids
 from ids import SingularError
-from pyDOE import *
+#from pyDOE import *
 from numba import jit
 import sys
 import math

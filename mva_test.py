@@ -11,7 +11,7 @@ import gen_mat as gen
 from scipy.spatial.distance import pdist
 from sobol_lib import *
 from block_rect_maxvol import *
-from gen_points import test_points_gen
+from gen_points import *
 
 @jit
 def NumOfClusters(pnts, tol=0.005, full=True):
@@ -237,6 +237,14 @@ def rosenbrock_sp(x,y):
 def roots_sp(x,y):
     return (sp.sqrt((x+2)**2 + (y+3)**2))
 
+def ellipse_sp(x,y):
+    b,e = 0.2,0.95
+    sigma,n = 0.1, 10
+    r = sp.sqrt(x**2 + y**2)
+    phi = sp.atan2(y,x)
+    R = r*sp.sqrt(1 - (e*sp.cos(phi))**2)/b
+    return((sp.exp(-1*(R**2)/(2*(sigma**2))))*sp.cos(n*phi))
+
 def f_quadro_3(x,y,z):
     return (2*((x**2)/2. + (y**2)/2. + (z**2)/2.))
 
@@ -279,6 +287,7 @@ f_many_dim   = symb_to_func(many_dim_sp,   5, True, False, name='Myltivariate')
 f_linear     = symb_to_func(linear_sp,     2, True, False, name='Linear')
 f_branin     = symb_to_func(branin_sp,     2, True, False, name='Branin')
 f_holsclaw   = symb_to_func(holsclaw_sp,   2, True, False, name='Holsclaw')
+f_ellipse    = symb_to_func(ellipse_sp,    2, True, False, name='Ellipse')
 
 f_gauss.diff      = MakeDiffs(gauss_sp, 2)
 f_sincos.diff     = MakeDiffs(sincos_sp, 2)
@@ -287,6 +296,7 @@ f_roots.diff      = MakeDiffs(roots_sp, 2)
 f_linear.diff     = MakeDiffs(linear_sp, 2, True)
 f_branin.diff     = MakeDiffs(branin_sp, 2)
 f_holsclaw.diff   = MakeDiffs(holsclaw_sp, 2)
+f_ellipse.diff    = MakeDiffs(ellipse_sp,  2)
 f_many_dim.diff   = MakeDiffs(many_dim_sp, 5, True)
 f_quadro_3.diff   = MakeDiffs(f_quadro_3, 3, True)
 
