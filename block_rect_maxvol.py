@@ -18,11 +18,11 @@ def DebugPrint(s):
 
         
 ###-------------- Service functions ----------------- ###
-@jit
+#@jit
 def form_permute(C, j, ind): #  REMOVE THIS
     C[ind],C[j]=C[j],C[ind]
     
-@jit
+#@jit
 def mov_row(C, j, ind_x): #  REMOVE THIS
     C[[ind_x,j],:] = C[[j,ind_x],:]        
 
@@ -45,6 +45,18 @@ def SWM(B, ndim, i, j):
     B -= np.dot(tmp_columns, np.dot(np.linalg.inv(b),tmp_rows))
     return (B)        
 
+def change_intersept(inew, iold):
+    """
+    change two sets of rows or columns when indices may intersept with preserving order
+    RETURN two sets of indices,
+    than say A[idx_n] = A[idx_o]
+    """
+
+    # DebugPrint(str(inew) + '<->' + str(iold))
+    union = np.array(list( set(inew) | set(iold) ))
+    idx_n = np.hstack((inew, np.setdiff1d(union, inew, assume_unique=True)))
+    idx_o = np.hstack((iold, np.setdiff1d(union, iold, assume_unique=True)))
+    return  idx_n.astype(int), idx_o.astype(int)
     
 # stuff to handle with matrix linings. Puts matrix U in the lining of A, i.e. : B = A*UA (default) or B = AUA*.
 class lining:
@@ -65,7 +77,7 @@ class lining:
         return np.dot(self.left, self.right_prod())
     
 # main func to form new coeff matrix
-@jit  
+#@jit  
 def rect_core(C, C_sigma, ndim):
     inv_block = la.inv(np.eye(ndim) + np.dot(C_sigma, C_sigma.conjugate().T))
     puzzle = lining(C_sigma,inv_block)
@@ -73,14 +85,22 @@ def rect_core(C, C_sigma, ndim):
     C_new = lining(C,U,inv = True).left_prod()
     return C_new, puzzle.assemble()
 
-@jit
+#@jit
 def cold_start(C, ndim):
     n = C.shape[0]
     values = []
     for i in range(0, n, ndim):
         CC_T = np.dot(C[i:i + ndim], C[i:i + ndim].conjugate().T)
-        values.append((CC_T))
+        values.append(CC_T)
     return values
+
+@jit
+def cold_start_tens(C,ndim):
+    num_block = C.shape[0] // ndim
+    S = np.empty((num_block, ndim, ndim))
+    for i in range(num_block):
+        S[i,:,:] = np.dot(C[i*ndim:i*ndim + ndim],C[i*ndim:i*ndim + ndim].T)
+    return(S)
 
 ### ------------------------------------
 def erase_init(func, x, nder, r):
@@ -164,10 +184,10 @@ def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd = True, debug = 
             iters += 1
         else:
             Fl = False 
-    return (P)   
+    return (P, B)   
 
 
-@jit
+#@jit
 def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
     ndim = nder + 1
     M, n = A_init.shape
@@ -215,8 +235,61 @@ def rect_block_maxvol_core(A_init, P, nder, Kmax, t = 0.05, to_erase=None):
                 
         shape_index += ndim
     return (C, CC_sigma, P)
+@jit
+def rect_block_core(C, P, nder, Kmax, t = 0.05, to_erase=None):
+    ndim = nder + 1
+    n, m = C.shape
+    num_block = n // ndim
+    k = Kmax // ndim
+    Fl = True
+    block_index = m // ndim
+    
+    S = cold_start_tens(C,ndim)
 
-
+    #C_new = np.empty((n, Kmax))
+    #C_new[:, :m] = C
+    while Fl and block_index < k:
+        #C = C_new[:, :block_index*ndim]
+        
+        #det_list = [la.det(np.eye(ndim) + S[i,:,:]) for i in range(num_block)]
+        det_list = la.det(np.eye(ndim) + S)
+        elem = np.argmax(det_list[block_index:]) + block_index
+        
+        if det_list[elem] > (1 + t):
+            range_j_dim = np.arange(block_index*ndim, block_index*ndim + ndim)
+            range_new_block = np.arange(elem*ndim, elem*ndim + ndim)
+            
+            S[[block_index, elem],:,:] = S[[elem, block_index],:,:]
+            indx_n, indx_o = change_intersept(range_j_dim, range_new_block)
+            
+            P[indx_n] = P[indx_o]
+            C[indx_n] = C[indx_o]
+            
+            #------ update part -----
+            #inv_block = la.inv(np.eye(ndim) + C[range_j_dim].dot(C[range_j_dim].T))
+            #op3 = C.dot(C[range_j_dim].T.dot(inv_block))
+            
+            block = np.eye(ndim) + C[range_j_dim].dot(C[range_j_dim].T)
+            op3 = C.dot(la.solve(block,C[range_j_dim]).T)
+            op4 = np.dot(op3, C[range_j_dim])
+            
+            #for i in range(block_index, num_block):
+            #   i_ndim = i*ndim
+            #    S[i,:,:] -= np.dot(op4[i_ndim:i_ndim + ndim],C[i_ndim:i_ndim + ndim].T)
+            
+            C = np.hstack((C - op4, op3))
+            if to_erase is not None:
+                ###----------------------------------
+                P, C = to_erase(P[range_j_dim],P,C)
+                ###----------------------------------
+            S = cold_start_tens(C,ndim)
+            #C -= op4
+            #C_new[:, block_index*ndim:block_index*(ndim)+ndim] = op3
+            block_index += 1
+        else:
+            #print('No relevant elements found')
+            Fl = False
+    return(C,S,P)
 
 # @jit
 def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug = False, to_erase = None):
@@ -226,13 +299,16 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
     DebugPrint ("Start")
 
-    pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=False, pullbacks=40,debug=False, overwrite_a=False)
-    DebugPrint ("ids.pluq_ids_index finishes")
+    try:
+        pluq_perm,lu = ids.plu_ids(A,nder,overwrite_a = False)
+    except:
+        pluq_perm, q, lu, inf = ids.pluq_ids(A, nder, do_pullback=False, pullbacks=40,debug=False, overwrite_a=False)
+        DebugPrint ("ids.pluq_ids_index finishes")
 
 
-    A = A[pluq_perm][:, q]
+    A = A[pluq_perm]#[:, q]
     DebugPrint ("block_maxvol starting")
-    perm = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
+    perm, C = block_maxvol(A, nder, tol = tol, max_iters=200, swm_upd=True)
     DebugPrint ("block_maxvol finishes")
 
 
@@ -241,10 +317,11 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
     ### Perform erasure after we got initial points in square matrix
     if to_erase is not None:
         #A1 = np.copy(A)
-        bm_perm, A = to_erase(bm_perm[:A.shape[1]],bm_perm,A)
+        bm_perm, C = to_erase(bm_perm[:C.shape[1]],bm_perm,C)
     #else:    
     #    A1 = A    
     DebugPrint ("rect_block_maxvol_core starts")
-    a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
+    #a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
+    a, b, final_perm = rect_block_core(C, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     DebugPrint ("rect_block_maxvol_core finishes")
     return (final_perm)

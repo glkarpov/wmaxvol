@@ -29,6 +29,7 @@ def halton(dim, n, start=0, bases=None):
 
 def GenSobol(dim = 2, N = 200,  seed = 0):
     res = np.empty((N, dim), dtype=float)
+    seed = np.random.randint(512)
     for i in range(N):
         res[i, :], seed = i4_sobol ( dim, seed )
 
@@ -48,9 +49,16 @@ def test_points_gen(n_test, nder, interval=(-1.0, 1.0), distrib='random', **kwar
 def polar(x):
     return math.hypot(x[0],x[1]),math.degrees(math.atan2(x[1],x[0]))
 
-def domain_erase(x, mod = 'electron'):
+def domain_erase(x, mod = 'blob'):
     erase_list = []
-    if mod == 'electron':
+    if mod == 'circle':
+        r0 = 0.8
+        for i in range(x.shape[0]):
+            r,phi = polar(x[i])
+            if (r > r0):
+                erase_list.append(i) 
+        
+    if mod == 'blob':
         r0 = 0.8
         a = 0.2
         k = 7
@@ -113,14 +121,89 @@ def domain_erase(x, mod = 'electron'):
     x = np.delete(x,erase_list,axis=0)            
     return (x)
 
+def plane_shape(x=None):
+    def f1(x):
+        return(np.sqrt((0.11)**2 - (x+0.89)**2)) 
+    def f2(x):
+        return(0.11)
+    def f3(x):
+        return(1.5*x + 0.56)
+    def f4(x):
+        return(0.95)
+    def f6(x):
+        return(1.1*x - 0.66)
+    def f7(x):
+        return(0.33)
 
+    f2vec = np.vectorize(f2, signature='()->()')
+    f4vec = np.vectorize(f4, signature='()->()')
+    f7vec = np.vectorize(f7, signature='()->()')
+    
+    x1 = np.linspace(-1,-0.89,200)
+    x2 = np.linspace(-0.89,-0.3,200)
+    x3 = np.linspace(-0.3,0.26,200)
+    x4 = np.linspace(0.26,0.36,200)
+    y5 = np.linspace(0.95,0.11,100)
+    x5 = np.empty(y5.shape)
+    x5.fill(0.36)
+    x6 = np.linspace(0.36,0.7,200)
+    x7 = np.linspace(0.7,0.9,200)
+    x8 = np.linspace(0.9,0.95,200)
+    y9  = np.linspace(0.33,-0.33,100)
+    x9 = np.empty(y9.shape)
+    x9.fill(0.95)
+    fig = plt.figure(figsize=(8,8))
+    plt.plot(x1,f1(x1), color="blue",lw=2)
+    plt.plot(x1,-1*f1(x1), color="blue",lw=2)
+    plt.plot(x2,f2vec(x2), color="blue",lw=2)
+    plt.plot(x2,-1*f2vec(x2), color="blue",lw=2)
+    plt.plot(x3,f3(x3), color="blue",lw=2)
+    plt.plot(x3,-1*f3(x3), color="blue",lw=2)
+    plt.plot(x4,f4vec(x4), color="blue",lw=2)
+    plt.plot(x4,-1*f4vec(x4), color="blue",lw=2)
+    plt.plot(x5, y5, color = 'blue',lw=2)
+    plt.plot(x5, -y5[::-1], color = 'blue',lw=2)
+    plt.plot(x6,f2vec(x6), color="blue",lw=2)
+    plt.plot(x6,-1*f2vec(x6), color="blue",lw=2)
+    plt.plot(x7,f6(x7), color="blue",lw=2)
+    plt.plot(x7,-1*f6(x7), color="blue",lw=2)
+    plt.plot(x8,f7vec(x8), color="blue",lw=2)
+    plt.plot(x8,-1*f7vec(x8), color="blue",lw=2)
+    plt.plot(x9, y9, color = 'blue',lw=2)
+    if x is not None:
+        plt.plot(x[:, 0], x[:, 1], 'r^')
+    plt.grid(True)
+
+def blob_wave_shape(x=None):
+    theta = np.arange(0,2*np.pi, 0.01)
+    r = 0.8 + 0.2*np.cos(7*theta)
+    xx = r*np.cos(theta)
+    yy = r*np.sin(theta)
+    plt.figure(figsize=(7,7))
+    plt.plot(xx, yy, color = 'blue',lw=2)
+    if x is not None:
+        plt.plot(x[:, 0], x[:, 1], 'r^')
+    plt.grid(True)
+    
+    
+def ellipse_shape(x=None):
+    phi = np.arange(0,2*np.pi, 0.01)
+    b= 0.2
+    e = 0.95
+    r = (b / np.sqrt(1-(e*np.cos(phi))**2))
+    xx = r*np.cos(phi)
+    yy = r*np.sin(phi)
+    fig = plt.figure(figsize=(8,6))
+    plt.plot(xx, yy, color = 'blue')
+    if x is not None:
+        plt.plot(x[:, 0], x[:, 1], 'r^')
+    plt.grid(True)  
+    
+    
 def complex_area_pnts_gen(n_test, nder, mod, distrib):
     k = 100
     while True:
-        if distrib == 'Sobol':
-            x_temp = GenSobol(k*n_test, nder, seed=random.randint(0,256),rng=(-1, 1))
-        else:
-            x_temp = test_points_gen(k*n_test, nder, distrib=distrib)
+        x_temp = test_points_gen(k*n_test, nder, distrib=distrib)
         if mod is not None:    
             x_temp = domain_erase(x_temp, mod = mod)    
         try:
