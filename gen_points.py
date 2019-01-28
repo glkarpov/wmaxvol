@@ -29,6 +29,7 @@ def halton(dim, n, start=0, bases=None):
 
 def GenSobol(dim = 2, N = 200,  seed = 0):
     res = np.empty((N, dim), dtype=float)
+    seed = np.random.randint(512)
     for i in range(N):
         res[i, :], seed = i4_sobol ( dim, seed )
 
@@ -50,6 +51,13 @@ def polar(x):
 
 def domain_erase(x, mod = 'blob'):
     erase_list = []
+    if mod == 'circle':
+        r0 = 0.8
+        for i in range(x.shape[0]):
+            r,phi = polar(x[i])
+            if (r > r0):
+                erase_list.append(i) 
+        
     if mod == 'blob':
         r0 = 0.8
         a = 0.2

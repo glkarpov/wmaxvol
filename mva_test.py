@@ -358,17 +358,11 @@ def test_bm(A, x, nder, col_expansion, N_rows, cut_radius = 0.15, to_save_pivs=T
 
 #------------------- Visualisation ----------
 
-def file_extraction(Filepath, new_extr = True):
-    if new_extr:
-        srch = re.compile(r'([\d\s]+)_Nrows=(\d+)_expans=(\d+)')
-        fnd = srch.findall(open(Filepath, 'r').read())
-        return tuple(np.array(i) for i in zip(*[(int(i1), int(i2), [int(p) for p in im1.strip().split(' ') if len(p) > 0])
-                                                for im1, i1, i2 in fnd]))
-    else:
-        srch = re.compile(r'([\d\s]+)_error=([\+\-\d\.eE]+)_Nrows=(\d+)_expans=(\d+)')
-        fnd = srch.findall(open(Filepath, 'r').read())
-        return tuple(np.array(i) for i in zip(*[(float(i0), int(i1), int(i2), [int(p) for p in im1.strip().split(' ') if len(p) > 0])
-                                                for im1, i0, i1, i2 in fnd]))
+def file_extraction(Filepath):
+    srch = re.compile(r'([\d\s]+)_Nrows=(\d+)_expans=(\d+)')
+    fnd = srch.findall(open(Filepath, 'r').read())
+    return tuple(np.array(i) for i in zip(*[(int(i1), int(i2), [int(p) for p in im1.strip().split(' ') if len(p) > 0])
+                                            for im1, i1, i2 in fnd]))
 
 
 def DataToMesh(error, N_row, N_col, *args):
