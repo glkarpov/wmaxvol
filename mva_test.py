@@ -85,7 +85,7 @@ def MakeValsAndNorms(funcs, pnts):
 
     return res
 
-# @jit
+@jit
 def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, funcs=None, derivative = True):
     A = GenMat(l, pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=derivative)
     
@@ -246,6 +246,18 @@ def rosenbrock_sp(x,y):
 def roots_sp(x,y):
     return (sp.sqrt((x+2)**2 + (y+3)**2))
 
+def schafferf6_sp(x,y):
+    return(1.5 + (sp.sin(sp.sqrt(x**2 + y**2))**2 - 0.5)/(1 + 0.001*(x**2 + y**2))**2)
+
+def yaf1_sp(x,y):
+    return(2*(x**2 + y**2)**3 - 2*((x**2 + y**2)**2)*sp.sqrt(x**2 + y**2) - sp.sqrt(x**5 + 5*x*(y**4) - 10*(x**3)*(y**2))) 
+
+def gabor_sp(x,y):
+    a = 1/(0.5*np.pi)
+    b = 1/(0.5)
+    c = 2*np.pi
+    return(a*sp.exp(-1*(x**2 + y**2)*b)*sp.cos(c*(x+y)))
+
 def ellipse_sp(x,y):
     b,e = 0.2,0.95
     sigma,n = 0.1, 10
@@ -297,6 +309,9 @@ f_many_dim   = symb_to_func(many_dim_sp,   5, True, False, name='Myltivariate')
 f_linear     = symb_to_func(linear_sp,     2, True, False, name='Linear')
 f_branin     = symb_to_func(branin_sp,     2, True, False, name='Branin')
 f_holsclaw   = symb_to_func(holsclaw_sp,   2, True, False, name='Holsclaw')
+f_schafferf6 = symb_to_func(schafferf6_sp, 2, True, False, name='Schaffer_F6')
+f_yaf1       = symb_to_func(yaf1_sp,       2, True, False, name='yaf1')
+f_gabor      = symb_to_func(gabor_sp,      2, True, False, name='Gabor')
 f_ellipse    = symb_to_func(ellipse_sp,    2, True, False, name='Ellipse')
 
 f_gauss.diff      = MakeDiffs(gauss_sp, 2)
@@ -307,6 +322,9 @@ f_roots.diff      = MakeDiffs(roots_sp, 2)
 f_linear.diff     = MakeDiffs(linear_sp, 2, True)
 f_branin.diff     = MakeDiffs(branin_sp, 2)
 f_holsclaw.diff   = MakeDiffs(holsclaw_sp, 2)
+f_schafferf6.diff = MakeDiffs(schafferf6_sp, 2)
+f_yaf1.diff       = MakeDiffs(yaf1_sp, 2)
+f_gabor.diff      = MakeDiffs(gabor_sp, 2)
 f_ellipse.diff    = MakeDiffs(ellipse_sp,  2)
 f_many_dim.diff   = MakeDiffs(many_dim_sp, 5, True)
 f_quadro_3.diff   = MakeDiffs(f_quadro_3, 3, True)

@@ -324,5 +324,5 @@ def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol = 0.05, tol = 0.0,debug
     #a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     a, b, final_perm = rect_block_core(C, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
     DebugPrint ("rect_block_maxvol_core finishes")
-    return final_perm[:Kmax:nder+1]//(nder+1)
+    return (final_perm)
 
