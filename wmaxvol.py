@@ -1,25 +1,25 @@
-import numpy as np
-from numba import jit
-import numpy.linalg as la
 from maxvolpy.maxvol import rect_maxvol
 from mva_test import *
 
+
 def C_upd_alpha(C_old, ndim, block_indx, alpha):
-    ix_range = np.arange(ndim*block_indx, ndim*(block_indx + 1))
-    int_prod = np.eye(ndim) + (alpha**2 - 1) * np.dot(C_old[ix_range], C_old[ix_range].T)
-    op1 = C_old @ ((alpha**2 - 1) * C_old[ix_range,:].T) @ la.inv(int_prod)
+    ix_range = np.arange(ndim * block_indx, ndim * (block_indx + 1))
+    int_prod = np.eye(ndim) + (alpha ** 2 - 1) * np.dot(C_old[ix_range], C_old[ix_range].T)
+    op1 = C_old @ ((alpha ** 2 - 1) * C_old[ix_range, :].T) @ la.inv(int_prod)
     op2 = op1 @ C_old[ix_range]
     C_new = (C_old - op2)
-    C_new[:,ix_range] =  C_new[:,ix_range] * alpha
+    C_new[:, ix_range] = C_new[:, ix_range] * alpha
     return C_new
 
+
 @jit
-def bmaxvol_sequent_coeff(A, n_iter, bas_length=None, block_size=1, to_use_recalc = False):
+def bmaxvol_sequent_coeff(A, n_iter, bas_length=None, block_size=1, to_use_recalc=False):
     ndim = block_size
     n, m = A.shape
     if bas_length is None:
         bas_length = max(ndim, m)
-    prod_shape = min(ndim, m)
+    if bas_length > n:
+        bas_length = n
     A_bas = np.copy(A[:bas_length])
     A_bas_base = np.copy(A_bas)
     c = np.dot(A, la.pinv(A_bas))
@@ -37,7 +37,7 @@ def bmaxvol_sequent_coeff(A, n_iter, bas_length=None, block_size=1, to_use_recal
             weights[ix] += 1
             if to_use_recalc:
                 C1 = np.copy(c)
-                c = C_upd_alpha(C1, ndim, ix, np.sqrt(weights[ix]/(weights[ix]-1)))
+                c = C_upd_alpha(C1, ndim, ix, np.sqrt(weights[ix] / (weights[ix] - 1)))
             else:
                 range_new_block = np.arange(ix * ndim, ix * ndim + ndim)
                 A_bas[range_new_block, :] = np.sqrt(weights[ix]) * A_bas_base[range_new_block, :]
@@ -51,7 +51,7 @@ def bmaxvol_sequent_coeff(A, n_iter, bas_length=None, block_size=1, to_use_recal
             c = np.dot(A, la.pinv(A_bas))
         S = cold_start_tens(c, ndim)
 
-    return (uniq_base_idx, weights)
+    return uniq_base_idx, weights
 
 
 @jit
@@ -69,7 +69,6 @@ def cold_start_tens(C, ndim):
     return S
 
 
-
 def maxvol_precondition(A, pivs):
     k = A.shape[1]
     indc, _ = rect_maxvol(A, maxK=max_pts(k))
@@ -79,16 +78,16 @@ def maxvol_precondition(A, pivs):
     return A, pivs
 
 
-
 def max_pts(m):
     return int(m * (m + 1) / 2)
 
-def wmaxvol(A, n_iter, out_dim, do_mv_precondition = True):
-    k = A.shape[1]
-    n_points = int(A.shape[0] / out_dim)
+
+def wmaxvol(a, n_iter, out_dim, do_mv_precondition=True):
+    k = a.shape[1]
+    n_points = int(a.shape[0] / out_dim)
     if do_mv_precondition:
-        A, pivs = maxvol_precondition(A, np.arange(A.shape[0]))
+        a, pivs = maxvol_precondition(a, np.arange(a.shape[0]))
     else:
         pivs = np.arange(n_points)
-    pts, wts = bmaxvol_sequent_coeff(A, n_iter, bas_length=max_pts(k), block_size=out_dim)
+    pts, wts = bmaxvol_sequent_coeff(a, n_iter, bas_length=max_pts(k) * out_dim, block_size=out_dim)
     return pivs[pts], wts.astype(int)
