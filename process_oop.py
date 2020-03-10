@@ -21,6 +21,7 @@ def main():
 
     expansions = np.unique(ex.cardinalities)[:k_first]
     config = Config()
+    config.load_external_space(x, cheb, 1)
     config.expansion_set = expansions
     config.n_iter = expansions[-1] * 1000
 

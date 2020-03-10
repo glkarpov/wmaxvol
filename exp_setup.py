@@ -35,7 +35,7 @@ class Config:
         self.design_space_cardinality = d.shape[0]
         self.design_dimension = d.shape[1]
         self.out_dim = out_dim
-        self.derivative = True
+        self.derivative = False
         self.poly = poly
 
     def mask_apply(self, x):
@@ -68,16 +68,18 @@ class Experiment_run:
     def run(self):
         setup = self.config
         if setup.expansion_set is None:
-            print('kek')
             setup.expansion_set = np.arange(setup.min_expansion, setup.max_expansion)
         else:
             setup.max_expansion = setup.expansion_set[-1]
         if setup.model_matrix is None:
-            x = complex_area_pnts_gen(setup.design_space_cardinality, setup.design_dimension, distrib='lhs',
-                                      mod=setup.domain_type)
-            if setup.to_apply_mask:
-                x = setup.mask_apply(x)
-            np.savez(os.path.join(self.results_folder, self.domain_fn), x=x)
+            if setup.design_space is None:
+                x = complex_area_pnts_gen(setup.design_space_cardinality, setup.design_dimension, distrib='lhs',
+                                          mod=setup.domain_type)
+                if setup.to_apply_mask:
+                    x = setup.mask_apply(x)
+                np.savez(os.path.join(self.results_folder, self.domain_fn), x=x)
+            else:
+                x = setup.design_space
             m = GenMat(setup.max_expansion * setup.out_dim, x, poly=setup.poly, debug=False, pow_p=1,
                        ToGenDiff=setup.derivative)
             if setup.derivative:
