@@ -10,6 +10,7 @@ class Config:
     def __init__(self):
         self.min_expansion = None
         self.max_expansion = None
+        self.expansion_set = None
         self.design_space = None
         self.model_matrix = None
         self.design_dimension = None
@@ -66,6 +67,11 @@ class Experiment_run:
 
     def run(self):
         setup = self.config
+        if setup.expansion_set is None:
+            print('kek')
+            setup.expansion_set = np.arange(setup.min_expansion, setup.max_expansion)
+        else:
+            setup.max_expansion = setup.expansion_set[-1]
         if setup.model_matrix is None:
             x = complex_area_pnts_gen(setup.design_space_cardinality, setup.design_dimension, distrib='lhs',
                                       mod=setup.domain_type)
@@ -80,7 +86,7 @@ class Experiment_run:
             m = setup.model_matrix
 
         f = open(os.path.join(self.results_folder, "designs_dim={}".format(setup.design_dimension) + '.txt'), "w")
-        for expansion in range(setup.min_expansion, setup.max_expansion):
+        for expansion in setup.expansion_set:
             a = np.copy(m[:, :expansion * setup.out_dim])
             try:
                 des_points, weights = self.wmaxvol_search(a, setup.n_iter, setup.out_dim)

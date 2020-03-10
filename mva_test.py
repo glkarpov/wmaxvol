@@ -1,21 +1,12 @@
 from __future__ import print_function
-import numpy as np
-import numpy.linalg as la
-from gen_mat import *
-# from sympy import *
-import sympy as sp
-from export_f_txt import FindDiff, symb_to_func, MakeDiffs, SymbVars
-from pyDOE import *
-from scipy.spatial.distance import pdist
-from sobol_lib import *
-from block_rect_maxvol import *
-from gen_points import *
-import sys
-import matplotlib.pyplot as plt
-import matplotlib
-from mpl_toolkits.mplot3d import Axes3D
 import re
+import sympy as sp
 from matplotlib import cm
+from scipy.spatial.distance import pdist
+from block_rect_maxvol import *
+from export_f_txt import symb_to_func, MakeDiffs, SymbVars
+from gen_mat import *
+from gen_points import *
 
 
 @jit
@@ -350,24 +341,6 @@ def test_bm(A, x, nder, col_expansion, N_rows, cut_radius=0.15, to_save_pivs=Tru
     assert pivs.size >= N_rows, "Wrong N_rows value"
     cut_piv = pivs[:N_rows]
     taken_indices = cut_piv[::(nder + 1)] // (nder + 1)
-
-    # if nder == 2 and (fnpdf is not None or to_export_pdf):
-    # l_bound = np.amin(x, 0)
-    # u_bound = np.amax(x, 0)
-    # delta = (u_bound - l_bound)/20.0
-    # fig = plt.figure()
-    # plt.xlim(l_bound[0] - delta[0], u_bound[0] + delta[0])
-    # plt.ylim(l_bound[1] - delta[1], u_bound[1] + delta[1])
-    # plt.plot(x[taken_indices, 0], x[taken_indices, 1], 'b^')
-    ##plt.title("E = {}".format(error))
-    # plt.grid(True)
-    # if fnpdf is None:
-    # fnpdf = 'func={}_columns={}_rows={}_pnts={}.pdf'.format(function.__name__, N_column, N_rows, len(taken_indices))
-    # fnpdf = 'columns={}_rows={}.pdf'.format(N_column, N_rows)
-    ##print("Num of points = {}, saving to file {}".format(len(taken_indices), fnpdf))
-    # plt.savefig(fnpdf)
-    # plt.close(fig)
-
     return taken_indices
 
 
