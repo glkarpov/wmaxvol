@@ -21,6 +21,7 @@ class experiment():
             self.weights = extract_design[3]
             self.weight_iter = [sum(j) for i, j in enumerate(self.weights)]
             self.norm_weights = False
+            self.cardinalities = [len(p) for p in self.p_indices]
 
     def normalize_weights(self):
         if self.weight_type == "weighted" and not self.norm_weights:
@@ -59,6 +60,9 @@ class experiment():
         for i, wght in enumerate(self.weights):
             card = len(wght)
             self.weights[i] = np.ones(card).tolist()
+
+    def update_cardinalities(self):
+        self.cardinalities = [len(p) for p in self.p_indices]
 
     def get_k_points(self, k, mode):
         if mode == "weights down":
