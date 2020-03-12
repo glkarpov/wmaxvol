@@ -1,9 +1,6 @@
-import sys
-import os
-from exp_setup import *
 import getopt
 import pathlib
-from numba import jit
+from exp_setup import *
 
 os.environ['OMP_NUM_THREADS'] = '6'
 print(os.environ['OMP_NUM_THREADS'])
