@@ -96,7 +96,7 @@ class experiment():
         bmv = np.array(Leb_e).reshape((1, len(Leb_e)))
         return bmv
 
-    def Lebesgue_all(self, points_test, poly=cheb, wwts=True):
+    def Lebesgue_all(self, points_test, poly=poly_power, wwts=True):
         if wwts:
             arg = self.weights
         else:
@@ -130,8 +130,14 @@ def index_preprocess(p_indices, N_col, exp_mask):
             indx += [np.array((i, j)) for i, j in zip(itertools.repeat(int(n_r)), a)]
         elif n_r == "all":
             indx += [np.array((len(p_indices[i]), i)) for i, j in enumerate(N_col)]
+    un = np.unique(np.array(indx), axis=0)
 
-    return np.unique(np.array(indx), axis=0)
+    Z = [x for _, x in sorted(zip(un[:, 1], un[:, 0]))]
+    a = np.sort(un[:, 1])
+    un[:, 0] = Z
+    un[:, 1] = a
+    return un
+
 
 
 def submask(mask, crt_mask):
@@ -141,9 +147,7 @@ def submask(mask, crt_mask):
 
 def mult_error_tensor(N_iter, mask, function, points_test, error_set, shape=None, derivative=False):
     ndim = points_test.shape[1]
-    block_size = ndim + 1
     error_tensor = np.empty((len(error_set), mask.shape[0], N_iter))
-    lebesgue_tensor = np.empty((len(error_set), mask.shape[0], N_iter))
     if type(function) is not list:
         function = [function]
     if function == [None]:
@@ -155,7 +159,6 @@ def mult_error_tensor(N_iter, mask, function, points_test, error_set, shape=None
         for i in range(mask.shape[0]):
             rows_exp, col_exp = mask[i, 0], mask[i, 1]
             for k, points_type in enumerate(error_set):
-                np.random.seed(s)
                 x_tmp = complex_area_pnts_gen(rows_exp, ndim, mod=shape, distrib=points_type)
                 if points_type == 'sobol' and len((np.where(x_tmp == np.array([[0., 0.], ])))[0]) != 0:
 
@@ -163,9 +166,13 @@ def mult_error_tensor(N_iter, mask, function, points_test, error_set, shape=None
                         x_tmp = complex_area_pnts_gen(rows_exp, ndim, mod=shape, distrib='sobol')
                         if len((np.where(x_tmp == np.array([[0., 0.], ])))[0]) == 0:
                             break
-                lebesgue_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp * block_size, poly=cheb, test_pnts=points_test,
+                if function == [None]:
+                    error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=cheb, test_pnts=points_test,
                                                          pow_p=1, funcs=ValsandNorms, derivative=derivative)
-    return lebesgue_tensor
+                else:
+                    _, error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=cheb, test_pnts=points_test,
+                                                         pow_p=1, funcs=ValsandNorms, derivative=derivative)
+    return error_tensor
 
 
 @jit
@@ -195,20 +202,20 @@ def error_tensor_plot(exp_list, mean_tensor, T_up, T_down,error_set, inx,mask,ex
     fig = plt.figure()
     plt.yscale('log')
     for k, points_type in enumerate(error_set):
-        plt.plot(mask[:,ax][inx], mean_tensor[k][inx], 'o', label = points_type)
+        plt.plot(mask[:,ax][inx], mean_tensor[k][inx], label = points_type)
         if confidence:
             plt.fill_between(mask[:,ax][inx], T_down[k][inx], T_up[k][inx], alpha = 0.4, label = '95% CI_'+points_type)
     for i, obj in enumerate(exp_list):
         plt.plot(mask[:,ax][inx], obj.error[inx], 'o', label = obj.name)
     if experiment_params[0]==1:
         plt.xlabel('Number of basis functions', fontsize=10)
-        fnpdf = dir_points+'err(cols)_points={}_func={}_new.pdf'.format(experiment_params[1],experiment_params[2])
+        fnpdf = dir_points+'err(cols)_points={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
     elif experiment_params[0] == 0:
         plt.xlabel('Number of points', fontsize=10)
-        fnpdf = dir_points+'err(rows)_monoms={}_func={}_new.pdf'.format(experiment_params[1],experiment_params[2])
+        fnpdf = dir_points+'err(rows)_monoms={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
     else:
         plt.xlabel('Number of points', fontsize=10)
-        fnpdf = dir_points+'err(points)_coef={}_func={}_ne.pdf'.format(experiment_params[1],experiment_params[2])
+        fnpdf = dir_points+'err(points)_coef={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
     #plt.ylabel('Approximation error, $\epsilon$', rotation=90, labelpad=5)
     plt.ylabel('Lebesgue constant', rotation=90, labelpad=5)
     plt.legend()
