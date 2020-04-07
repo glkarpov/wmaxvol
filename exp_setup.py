@@ -101,7 +101,10 @@ class Experiment_run:
             m = setup.model_matrix
 
         f = open(os.path.join(self.results_folder, "designs_dim={}{}".format(setup.design_dimension,setup.add_name) + '.txt'), "w")
+        transit_expansion = setup.expansion_set[0]
         for expansion in setup.expansion_set:
+            exp_diff = expansion - transit_expansion
+            setup.n_iter += (exp_diff * (transit_expansion + 1) + exp_diff * (exp_diff - 1) / 2) * setup.delta_n
             a = np.copy(m[:, :expansion * setup.out_dim])
             try:
                 des_points, weights = self.wmaxvol_search(a, setup.n_iter, setup.out_dim)
@@ -114,5 +117,6 @@ class Experiment_run:
             f.write("_expans={}\n".format(expansion))
             weights.tofile(f, sep=" ")
             f.write("_iter={}\n".format(setup.n_iter))
-            setup.n_iter += expansion * setup.delta_n
+            #setup.n_iter += expansion * setup.delta_n
+            transit_expansion = expansion
             f.flush()
