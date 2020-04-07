@@ -23,12 +23,16 @@ class Config:
         self.poly = cheb
         self.to_apply_mask = False
         self.mask = None
+        self.add_name = ''
+        self.pow_p = 1
+
 
     def load_external_model(self, model_matrix, out_dim):
         self.model_matrix = model_matrix
         self.min_expansion = model_matrix.shape[1]
         self.max_expansion = self.min_expansion + 1
         self.out_dim = out_dim
+
 
     def load_external_space(self, d, poly, out_dim):
         self.design_space = d
@@ -37,6 +41,7 @@ class Config:
         self.out_dim = out_dim
         self.derivative = False
         self.poly = poly
+
 
     def mask_apply(self, x):
         dim = self.design_dimension
@@ -54,7 +59,15 @@ class Experiment_run:
             os.makedirs(self.results_folder)
         except:
             pass
-        self.domain_fn = 'domain_' + 'dim = {}'.format(self.config.design_dimension)
+        self.domain_fn = 'domain_' + 'dim={}'.format(self.config.design_dimension)
+        if self.config.add_name is not '':
+            self.config.add_name = '_' + self.config.add_name
+        try:
+            taken_points = np.load(os.path.join(self.results_folder, self.domain_fn + ".npz"))
+            x = taken_points['x']
+            self.config.load_external_space(x, cheb, 1)
+        except:
+            pass 
 
     @staticmethod
     def wmaxvol_search(A, n_iter, out_dim):
@@ -80,14 +93,14 @@ class Experiment_run:
                 np.savez(os.path.join(self.results_folder, self.domain_fn), x=x)
             else:
                 x = setup.design_space
-            m = GenMat(setup.max_expansion * setup.out_dim, x, poly=setup.poly, debug=False, pow_p=1,
+            m = GenMat(setup.max_expansion * setup.out_dim, x, poly=setup.poly, debug=False, pow_p=setup.pow_p,
                        ToGenDiff=setup.derivative)
             if setup.derivative:
                 m = matrix_prep(m, ndim)
         else:
             m = setup.model_matrix
 
-        f = open(os.path.join(self.results_folder, "designs_dim={}".format(setup.design_dimension) + '.txt'), "w")
+        f = open(os.path.join(self.results_folder, "designs_dim={}{}".format(setup.design_dimension,setup.add_name) + '.txt'), "w")
         for expansion in setup.expansion_set:
             a = np.copy(m[:, :expansion * setup.out_dim])
             try:

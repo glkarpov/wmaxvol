@@ -248,7 +248,7 @@ def ellipse_sp(x, y):
     return (sp.exp(-1 * (R ** 2) / (2 * (sigma ** 2)))) * sp.cos(n * phi)
 
 
-def f_quadro_3(x, y, z):
+def triple_sp(x, y, z):
     return 2 * ((x ** 2) / 2. + (y ** 2) / 2. + (z ** 2) / 2.)
 
 
@@ -283,8 +283,8 @@ def piston(M, S, V_0, k, P_0, T_a, T_0):
     T_0 = ((T_0 + 1) * 20) / 2. + 340
 
     A = P_0 * S + 19.62 * M - k * V_0 / S
-    V = S / (2 * k) * (np.sqrt(A ** 2 + 4 * k * P_0 * V_0 * T_a / T_0) - A)
-    C = 2 * np.pi * np.sqrt(M / (k + S ** 2 * P_0 * V_0 * T_a / (T_0 * V ** 2)))
+    V = S / (2 * k) * (sp.sqrt(A ** 2 + 4 * k * P_0 * V_0 * T_a / T_0) - A)
+    C = 2 * np.pi * sp.sqrt(M / (k + S ** 2 * P_0 * V_0 * T_a / (T_0 * V ** 2)))
     return C
 
 
@@ -293,7 +293,8 @@ f_gauss_doubl = symb_to_func(gauss_double_sp, 2, True, False, name='Gauss_doubl'
 f_sincos = symb_to_func(sincos_sp, 2, True, False, name='Sincos')
 f_rosenbrock = symb_to_func(rosenbrock_sp, 2, True, False, name='Rosenbrock')
 f_roots = symb_to_func(roots_sp, 2, True, False, name='Roots')
-f_many_dim = symb_to_func(many_dim_sp, 5, True, False, name='Myltivariate')
+f_triple = symb_to_func(triple_sp, 3, True, False, name='Parabolic_3')
+f_many_dim = symb_to_func(many_dim_sp, 5, True, False, name='Multivariate')
 f_linear = symb_to_func(linear_sp, 2, True, False, name='Linear')
 f_branin = symb_to_func(branin_sp, 2, True, False, name='Branin')
 f_holsclaw = symb_to_func(holsclaw_sp, 2, True, False, name='Holsclaw')
@@ -301,6 +302,8 @@ f_schafferf6 = symb_to_func(schafferf6_sp, 2, True, False, name='Schaffer_F6')
 f_yaf1 = symb_to_func(yaf1_sp, 2, True, False, name='yaf1')
 f_gabor = symb_to_func(gabor_sp, 2, True, False, name='Gabor')
 f_ellipse = symb_to_func(ellipse_sp, 2, True, False, name='Ellipse')
+f_piston = symb_to_func(piston, 7, True, False, name='Piston')
+
 
 f_gauss.diff = MakeDiffs(gauss_sp, 2)
 f_gauss_doubl.diff = MakeDiffs(gauss_double_sp, 2)
@@ -315,7 +318,8 @@ f_yaf1.diff = MakeDiffs(yaf1_sp, 2)
 f_gabor.diff = MakeDiffs(gabor_sp, 2)
 f_ellipse.diff = MakeDiffs(ellipse_sp, 2)
 f_many_dim.diff = MakeDiffs(many_dim_sp, 5, True)
-f_quadro_3.diff = MakeDiffs(f_quadro_3, 3, True)
+f_triple.diff = MakeDiffs(triple_sp, 3, True)
+f_piston.diff = MakeDiffs(piston, 7, True)
 
 
 def test_bm(A, x, nder, col_expansion, N_rows, cut_radius=0.15, to_save_pivs=True, to_export_pdf=True, fnpdf=None):

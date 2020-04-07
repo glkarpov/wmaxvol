@@ -8,7 +8,7 @@ print(os.environ['OMP_NUM_THREADS'])
 
 
 def main():
-    N_iter = 1
+    N_iter = 50
     test_space_cardinality = 50000
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'a:b:c:', ['ndim=', 'experiment=', 'func='])
@@ -25,7 +25,7 @@ def main():
         sys.exit(2)
 
     cur_pos = str(pathlib.Path(__file__).parent.absolute())
-    exp_folder = "/domain_exp_55-_lebesgue_dim{}/".format(ndim)
+    exp_folder = "/domain_exp_70-_lebesgue_dim{}/".format(ndim)
     dir_points = cur_pos + exp_folder
     design_space = "domain_dim={}".format(ndim)
     test_design_space = "test_domain_dim={}".format(ndim)
@@ -39,7 +39,7 @@ def main():
         np.savez(os.path.join(dir_points, test_design_space), x=points_test)
 
     ### Experiment setup
-    error_set = ['lhs', 'random', 'sobol']
+    error_set = ['random','lhs','sobol']
     col_to_fix = []
     point_to_fix = ["all"]
     slice_coeff = None
