@@ -104,7 +104,7 @@ class Experiment_run:
         transit_expansion = setup.expansion_set[0]
         for expansion in setup.expansion_set:
             exp_diff = expansion - transit_expansion
-            setup.n_iter += (exp_diff * (transit_expansion + 1) + exp_diff * (exp_diff - 1) / 2) * setup.delta_n
+            setup.n_iter += (int(exp_diff * (transit_expansion + 1) + exp_diff * (exp_diff - 1) / 2)) * setup.delta_n
             a = np.copy(m[:, :expansion * setup.out_dim])
             try:
                 des_points, weights = self.wmaxvol_search(a, setup.n_iter, setup.out_dim)
