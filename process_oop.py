@@ -1,16 +1,25 @@
 import pathlib
 from exp_setup import *
 from exp_proccess import *
+import getopt
 
 os.environ['OMP_NUM_THREADS'] = '6'
 print(os.environ['OMP_NUM_THREADS'])
 
 
 def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'a:', ['ndim='])
+        for currentArgument, currentValue in opts:
+            if currentArgument in ("-a", "--ndim"):
+                ndim = int(currentValue)
+    except getopt.GetoptError:
+        print('Parsing error')
+        sys.exit(2)
+
     cur_pos = str(pathlib.Path(__file__).parent.absolute())
-    ndim = 2
-    k_first = 12
-    exp_folder = "/domain_exp_35-_lebesgue_dim{}/".format(ndim)
+    k_first = 15
+    exp_folder = "/domain_exp_70-_lebesgue_dim{}/".format(ndim)
     dir_points = cur_pos + exp_folder
     design_space = "domain_dim={}".format(ndim)
     calc_design = "designs_dim={}.txt".format(ndim)
@@ -23,8 +32,11 @@ def main():
     config = Config()
     config.load_external_space(x, cheb, 1)
     config.expansion_set = expansions
-    config.n_iter = expansions[-1] * 1000
-
+    config.n_iter = 200
+    config.delta_n = 10
+    config.add_name = 'expand'
+    worker = Experiment_run(config, dir_points)
+    worker.run()
 
 if __name__ == "__main__":
     main()
