@@ -30,6 +30,9 @@ def main():
     design_space = "domain_dim={}".format(ndim)
     test_design_space = "test_domain_dim={}".format(ndim)
     ex = experiment(dir_points + design_space, dir_points + calc_design, ndim, 1)
+    #ex.get_k_points(5, mode="equal_to_columns")
+    ex.pow_p = 1
+    ex.poly = cheb
     try:
         domain = np.load(dir_points + test_design_space + ".npz")
         points_test = domain['x']
@@ -51,8 +54,7 @@ def main():
         function = [function]
     mesh = np.copy(mask)
     mesh[:, 1] = ex.expans[mask[:, 1]]
-    # for function in function_set:
-    error_tensor = mult_error_tensor(N_iter, mesh, function, points_test, error_set, shape=None)
+    error_tensor = mult_error_tensor(N_iter, mesh, function, points_test, error_set, poly_basis = ex.poly, pow_poly = ex.pow_p, shape=None)
 
     if function == [None]:
         tensor_name = 'error_leb_'

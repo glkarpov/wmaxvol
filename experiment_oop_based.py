@@ -29,10 +29,11 @@ def main():
 
     if config.design_space_cardinality is None:
         config.design_space_cardinality = 10000
-    config.n_iter = 100
-    config.delta_n = 50
-
-    add_str = '-'.join([str(i) for i in [config.max_expansion, "descr"]])
+    config.n_iter = 300
+    config.delta_n = 10
+    config.add_name = ''
+    config.pow_p = 1
+    add_str = '-'.join([str(i) for i in [config.max_expansion, "_lebesgue_dim{}".format(config.design_dimension)]])
     dir_str = cur_pos + '/domain_exp_' + add_str
 
     worker = Experiment_run(config, dir_str)
