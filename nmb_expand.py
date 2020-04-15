@@ -7,9 +7,20 @@ os.environ['OMP_NUM_THREADS'] = '6'
 print(os.environ['OMP_NUM_THREADS'])
 
 
+def find_best_design_for_test(ex: Experiment):
+    aim = 35
+    max_expans = ex.expans[-1]
+    for i, design_size in enumerate(ex.cardinalities):
+        if design_size > max_expans:
+            aim = i - 1
+            break
+    return aim, 70 - ex.cardinalities[aim]
+
+
 def main():
-    N_iter = 50
+    n_iter = 50
     test_space_cardinality = 50000
+    add_name = "wise_expand"
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'a:b:c:', ['ndim=', 'experiment=', 'func='])
         for currentArgument, currentValue in opts:
@@ -17,7 +28,7 @@ def main():
                 ndim = int(currentValue)
             elif currentArgument in ("-b", "--experiment"):
                 exp_name = str(currentValue)
-                calc_design = str(currentValue)+".txt"
+                calc_design = str(currentValue) + ".txt"
             elif currentArgument in ("-c", "--func"):
                 function = None if currentValue == 'None' else eval(currentValue)
     except getopt.GetoptError:
@@ -30,19 +41,28 @@ def main():
     design_space = "domain_dim={}".format(ndim)
     test_design_space = "test_domain_dim={}".format(ndim)
     ex = Experiment(dir_points + design_space, dir_points + calc_design, ndim, 1)
-    #ex.get_k_points(5, mode="equal_to_columns")
-    ex.pow_p = 1
-    ex.poly = cheb
+    start_idx, back_idx = find_best_design_for_test(ex)
+    ex_new = deepcopy(ex)
+    ex_new.expans = ex.expans[start_idx:-back_idx]
+    ex_new.p_indices = ex.p_indices[start_idx:-back_idx]
+    ex_new.weights = ex.weights[start_idx:-back_idx]
+    border = ex.cardinalities[start_idx]
+    ex_new.get_k_points(border, 'None')
+    ex_new.update_cardinalities()
+    ex_new.pow_p = 1
+    ex_new.poly = cheb
+    ex_new.export_to_file(dir_points, add_name)
+
     try:
         domain = np.load(dir_points + test_design_space + ".npz")
         points_test = domain['x']
     except:
         points_test = complex_area_pnts_gen(test_space_cardinality, ndim, distrib='lhs',
-                                  mod=None)
+                                            mod=None)
         np.savez(os.path.join(dir_points, test_design_space), x=points_test)
 
     ### Experiment setup
-    error_set = ['random','lhs','sobol']
+    error_set = ['random', 'lhs', 'sobol']
     col_to_fix = []
     point_to_fix = ["all"]
     slice_coeff = None
@@ -54,13 +74,14 @@ def main():
         function = [function]
     mesh = np.copy(mask)
     mesh[:, 1] = ex.expans[mask[:, 1]]
-    error_tensor = mult_error_tensor(N_iter, mesh, function, points_test, error_set, poly_basis = ex.poly, pow_poly = ex.pow_p, shape=None)
+    error_tensor = mult_error_tensor(n_iter, mesh, function, points_test, error_set, poly_basis=ex.poly,
+                                     pow_poly=ex.pow_p, shape=None)
 
     if function == [None]:
         tensor_name = 'error_leb_'
     else:
         tensor_name = 'error_{}_'.format(function[0].__name__)
-    np.savez(os.path.join(dir_points, tensor_name)+exp_name, error_tensor=error_tensor)
+    np.savez(os.path.join(dir_points, tensor_name) + exp_name + '_' + add_name, error_tensor=error_tensor)
 
 
 if __name__ == "__main__":

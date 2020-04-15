@@ -26,7 +26,7 @@ def main():
 
     taken_points = np.load(dir_points + design_space + ".npz")
     x = taken_points['x']
-    ex = experiment(dir_points + design_space, dir_points + calc_design, ndim, 1)
+    ex = Experiment(dir_points + design_space, dir_points + calc_design, ndim, 1)
 
     expansions = np.unique(ex.cardinalities)[:k_first]
     config = Config()
@@ -35,7 +35,7 @@ def main():
     config.n_iter = 200
     config.delta_n = 10
     config.add_name = 'expand'
-    worker = Experiment_run(config, dir_points)
+    worker = ExperimentRun(config, dir_points)
     worker.run()
 
 if __name__ == "__main__":

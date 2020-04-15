@@ -26,13 +26,11 @@ class Config:
         self.add_name = ''
         self.pow_p = 1
 
-
     def load_external_model(self, model_matrix, out_dim):
         self.model_matrix = model_matrix
         self.min_expansion = model_matrix.shape[1]
         self.max_expansion = self.min_expansion + 1
         self.out_dim = out_dim
-
 
     def load_external_space(self, d, poly, out_dim):
         self.design_space = d
@@ -42,7 +40,6 @@ class Config:
         self.derivative = False
         self.poly = poly
 
-
     def mask_apply(self, x):
         dim = self.design_dimension
         for i in range(dim):
@@ -51,7 +48,7 @@ class Config:
         return x
 
 
-class Experiment_run:
+class ExperimentRun:
     def __init__(self, config, results_folder):
         self.config = config
         self.results_folder = results_folder
@@ -67,7 +64,7 @@ class Experiment_run:
             x = taken_points['x']
             self.config.load_external_space(x, cheb, 1)
         except:
-            pass 
+            pass
 
     @staticmethod
     def wmaxvol_search(A, n_iter, out_dim):
@@ -100,7 +97,8 @@ class Experiment_run:
         else:
             m = setup.model_matrix
 
-        f = open(os.path.join(self.results_folder, "designs_dim={}{}".format(setup.design_dimension,setup.add_name) + '.txt'), "w")
+        f = open(os.path.join(self.results_folder,
+                              "designs_dim={}{}".format(setup.design_dimension, setup.add_name) + '.txt'), "w")
         transit_expansion = setup.expansion_set[0]
         for expansion in setup.expansion_set:
             exp_diff = expansion - transit_expansion
@@ -117,6 +115,6 @@ class Experiment_run:
             f.write("_expans={}\n".format(expansion))
             weights.tofile(f, sep=" ")
             f.write("_iter={}\n".format(setup.n_iter))
-            #setup.n_iter += expansion * setup.delta_n
+            # setup.n_iter += expansion * setup.delta_n
             transit_expansion = expansion
             f.flush()

@@ -1,7 +1,8 @@
 from mva_test import *
+import os
 
 
-class experiment():
+class Experiment:
     def __init__(self, path_dspace, path_calculated_design, design_dim, out_dim):
         self.design_space_path = path_dspace
         self.ndim = design_dim
@@ -9,7 +10,7 @@ class experiment():
         self.pow_p = 1
         self.poly = cheb
         self.derivative = False
-        extract_design = file_extraction((path_calculated_design))
+        extract_design = file_extraction(path_calculated_design)
         if len(extract_design) == 3:
             self.weight_type = "uniweighted"
             self.n_rows = extract_design[0]
@@ -25,6 +26,17 @@ class experiment():
             self.norm_weights = False
             self.cardinalities = [len(p) for p in self.p_indices]
 
+    def export_to_file(self, folder_path, add_name):
+        if add_name is not '':
+            add_name = '_' + add_name
+        f = open(os.path.join(folder_path, "designs_dim={}{}".format(self.ndim, add_name) + '.txt'), "w")
+        for i, expansion in enumerate(self.expans):
+            np.array(self.p_indices[i]).tofile(f, sep=" ")
+            f.write("_expans={}\n".format(expansion))
+            np.array(self.weights[i]).tofile(f, sep=" ")
+            f.write("_iter={}\n".format(self.weight_iter[i]))
+            f.flush()
+
     def normalize_weights(self):
         if self.weight_type == "weighted" and not self.norm_weights:
             for i, iter in enumerate(self.weight_iter):
@@ -38,10 +50,8 @@ class experiment():
         for i, exp in enumerate(self.expans):
             print(self.p_indices[i], self.weights[i], exp)
 
-
     def apply_exp_mask(self, exp_mask):
         self.mask = index_preprocess(self.p_indices, self.expans, exp_mask)
-
 
     def index_preproc(self, exp_mask):
         indx = []
@@ -53,7 +63,6 @@ class experiment():
         indx = np.array(indx)
         self.mask = np.unique(indx, axis=0)
 
-
     def error_calculation(self, function, points_test):
         taken_points = np.load(self.design_space_path + ".npz")
         x = taken_points['x']
@@ -61,16 +70,13 @@ class experiment():
                              derivative=self.derivative)
         return error
 
-
     def set_weights_ones(self):
         for i, wght in enumerate(self.weights):
             card = len(wght)
             self.weights[i] = np.ones(card).tolist()
 
-
     def update_cardinalities(self):
         self.cardinalities = [len(p) for p in self.p_indices]
-
 
     def get_k_points(self, k, mode):
         if mode == "weights down":
@@ -85,28 +91,29 @@ class experiment():
                 self.p_indices[i] = Z[-self.expans[i]:]
                 self.weights[i] = sorted(self.weights[i])[-self.expans[i]:]
                 self.weight_iter = [sum(j) for i, j in enumerate(self.weights)]
-
+        if mode == "None":
+            for i, p_ind in enumerate(self.p_indices):
+                self.p_indices[i] = p_ind[:k]
+                self.weights[i] = self.weights[i][:k]
 
     def change_expans(self, mode):
         if mode == "up_to_points":
             for i, p_ind in enumerate(self.p_indices):
                 self.expans[i] = len(p_ind)
 
-
-    def Lebesgue_mask(self, points_test):
+    def lebesgue_mask(self, points_test):
         Leb_e = []
         taken_points = np.load(self.design_space_path + ".npz")
         x = taken_points['x']
         for i in range(self.mask.shape[0]):
             rows_exp, col_exp = self.mask[i, 0], self.expans[self.mask[i, 1]]
             p = self.p_indices[self.mask[i, 1]][:rows_exp]
-            b = LebesgueConst(x[p], col_exp * (self.out_dim), poly=cheb, test_pnts=points_test, pow_p=1, wts=None,
+            b = LebesgueConst(x[p], col_exp * self.out_dim, poly=cheb, test_pnts=points_test, pow_p=1, wts=None,
                               funcs=None, derivative=self.derivative)
             Leb_e.append(b)
         return np.array(Leb_e).reshape((1, len(Leb_e)))
 
-
-    def Lebesgue_all(self, points_test, wwts=True):
+    def lebesgue_all(self, points_test, function, wwts=True):
         if wwts:
             arg = self.weights
         else:
@@ -114,15 +121,24 @@ class experiment():
         error = []
         taken_points = np.load(self.design_space_path + ".npz")
         x = taken_points['x']
+        if type(function) is not list:
+            function = [function]
+        if function == [None]:
+            ValsandNorms = None
+        else:
+            ValsandNorms = MakeValsAndNorms(function, points_test)
+
         for i, col_exp in enumerate(self.expans):
             p = self.p_indices[i]
             if function == [None]:
-                b = LebesgueConst(x[p], col_exp, poly=self.poly, test_pnts=points_test, pow_p=self.pow_p, funcs=ValsandNorms, derivative=self.derivative)
+                b = LebesgueConst(x[p], col_exp, poly=self.poly, test_pnts=points_test, pow_p=self.pow_p,
+                                  funcs=ValsandNorms, derivative=self.derivative)
             else:
-                _, b = LebesgueConst(x[p], col_exp, poly=self.poly, test_pnts=points_test, pow_p=self.pow_p, funcs=ValsandNorms, derivative=self.derivative)            
+                _, b = LebesgueConst(x[p], col_exp, poly=self.poly, test_pnts=points_test, pow_p=self.pow_p,
+                                     funcs=ValsandNorms, derivative=self.derivative)
 
             error.append(b)
-        return  np.array(error).reshape((1, len(error)))
+        return np.array(error).reshape((1, len(error)))
 
 
 def index_preprocess(p_indices, N_col, exp_mask):
@@ -151,13 +167,13 @@ def index_preprocess(p_indices, N_col, exp_mask):
     return un
 
 
-
 def submask(mask, crt_mask):
     rt = [(mask == crt_mask[i, :]).all(axis=1).nonzero()[0][0] for i in range(crt_mask.shape[0])]
     return rt
 
 
-def mult_error_tensor(N_iter, mask, function, points_test, error_set, poly_basis, pow_poly = 1,  shape=None, derivative=False):
+def mult_error_tensor(N_iter, mask, function, points_test, error_set, poly_basis, pow_poly=1, shape=None,
+                      derivative=False):
     ndim = points_test.shape[1]
     error_tensor = np.empty((len(error_set), mask.shape[0], N_iter))
     if type(function) is not list:
@@ -180,10 +196,10 @@ def mult_error_tensor(N_iter, mask, function, points_test, error_set, poly_basis
                             break
                 if function == [None]:
                     error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=poly_basis, test_pnts=points_test,
-                                                         pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
+                                                          pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
                 else:
                     _, error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=poly_basis, test_pnts=points_test,
-                                                         pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
+                                                             pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
     return error_tensor
 
 
@@ -206,29 +222,30 @@ def maxvol_error(x, function, points_test, p_indices, N_col, mask, derivative=Tr
     return np.array(error_bmaxvol).reshape((1, len(error_bmaxvol)))
 
 
-def error_tensor_plot(exp_list, mean_tensor, T_up, T_down,error_set, inx,mask,experiment_params, dir_points, confidence = False):
+def error_tensor_plot(exp_list, mean_tensor, T_up, T_down, error_set, inx, mask, experiment_params, dir_points,
+                      confidence=False):
     ax = experiment_params[0]
     if experiment_params[0] == 2:
         ax = 0
     fig = plt.figure()
     plt.yscale('log')
     for k, points_type in enumerate(error_set):
-        plt.plot(mask[:,ax][inx], mean_tensor[k][inx], label = points_type)
+        plt.plot(mask[:, ax][inx], mean_tensor[k][inx], label=points_type)
         if confidence:
-            plt.fill_between(mask[:,ax][inx], T_down[k][inx], T_up[k][inx], alpha = 0.4, label = '95% CI_'+points_type)
+            plt.fill_between(mask[:, ax][inx], T_down[k][inx], T_up[k][inx], alpha=0.4, label='95% CI_' + points_type)
     for i, obj in enumerate(exp_list):
-        plt.scatter(mask[:,ax][inx], obj.error[inx], s = 0.5, label = obj.name)
+        plt.scatter(mask[:, ax][inx], obj.error[inx], s=0.5, label=obj.name)
 
-    if experiment_params[0]==1:
+    if experiment_params[0] == 1:
         plt.xlabel('Number of basis functions', fontsize=10)
-        fnpdf = dir_points+'err(cols)_points={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
+        fnpdf = dir_points + 'err(cols)_points={}_func={}.pdf'.format(experiment_params[1], experiment_params[2])
     elif experiment_params[0] == 0:
         plt.xlabel('Number of points', fontsize=10)
-        fnpdf = dir_points+'err(rows)_monoms={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
+        fnpdf = dir_points + 'err(rows)_monoms={}_func={}.pdf'.format(experiment_params[1], experiment_params[2])
     else:
         plt.xlabel('Number of points', fontsize=10)
-        fnpdf = dir_points+'err(points)_coef={}_func={}.pdf'.format(experiment_params[1],experiment_params[2])
-    #plt.ylabel('Approximation error, $\epsilon$', rotation=90, labelpad=5)
+        fnpdf = dir_points + 'err(points)_coef={}_func={}.pdf'.format(experiment_params[1], experiment_params[2])
+    # plt.ylabel('Approximation error, $\epsilon$', rotation=90, labelpad=5)
     plt.ylabel('Lebesgue constant', rotation=90, labelpad=5)
     plt.legend()
     plt.grid(True)

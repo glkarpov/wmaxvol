@@ -36,7 +36,7 @@ def main():
     add_str = '-'.join([str(i) for i in [config.max_expansion, "_lebesgue_dim{}".format(config.design_dimension)]])
     dir_str = cur_pos + '/domain_exp_' + add_str
 
-    worker = Experiment_run(config, dir_str)
+    worker = ExperimentRun(config, dir_str)
     worker.run()
 
 
