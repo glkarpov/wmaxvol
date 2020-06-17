@@ -9,7 +9,9 @@ import numpy.linalg as LA
 
 from numpy.polynomial import Chebyshev as T
 import gen_mat as gen
-from numba import jit
+from numba import jit, prange
+
+#prange = range
 
 """
 These two functions are accelerated (precompilled and parallelized) by using @jit decorator from numba 
@@ -53,7 +55,7 @@ def grad(points, poly=gen.cheb):
     T_deriv = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     T_val   = np.empty((tot_elems, max_degree + 1), dtype = points.dtype)
     points_flat = points.ravel('F')
-    for i in range(max_degree + 1):
+    for i in prange(max_degree + 1):
         T_deriv[:, i] = poly.diff(points_flat, i)
         T_val[:, i]   = poly     (points_flat, i)
 
@@ -67,7 +69,7 @@ def grad(points, poly=gen.cheb):
     # here is implemented analytical formula (for multidimensional case)
 
     grad_vec = np.zeros(tot_elems, dtype = points.dtype)
-    for k in range(tot_elems):
+    for k in prange(tot_elems):
         col = k//num_of_points
         row = k%num_of_points
         A_row = A[row]
