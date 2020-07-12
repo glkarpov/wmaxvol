@@ -16,10 +16,10 @@ from numba import jit
 # import sympy
 # from sympy import *
 from copy import copy, deepcopy
+import sympy as sp
 
 
 xrange = range
-
 
 # Combinatorials funcs
 
@@ -527,15 +527,15 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
 
 
 @jit
-def GenFunc(coeffs, l, poly=None, poly_diff=None, debug=False, pow_p=1, ToGenDiff=False):
+def GenFunc(coeffs, l, poly=None, poly_diff=None, debug=False, pow_p=1, ToGenDiff=False, ret_sum=True):
     """
     Generates a function that gives RH using given points and solution
     coeffs -- solution of the system
     l -- dimension
     """
-    import sympy as sp
+    #import sympy as sp
     n_size = len(coeffs)
-    xs = ['x' + str(i) for i in xrange(l)]
+    xs = ['x' + str(i) for i in range(l)]
     vars_f = sp.symbols(' '.join(xs))
     A_symb = GenMat(n_size, np.array([vars_f]), poly=poly,
                 poly_diff=poly_diff, debug=debug, pow_p=pow_p, ToGenDiff=ToGenDiff )
@@ -544,9 +544,11 @@ def GenFunc(coeffs, l, poly=None, poly_diff=None, debug=False, pow_p=1, ToGenDif
     if ToGenDiff:
         res = [ eval( "lambda {}: {}".format(params, i.dot(coeffs)) ) for i in A_symb ]
     else:
-        f_l = "lambda {}: {}".format(params, A_symb[0, :].dot(coeffs))
+        if ret_sum:
+            f_l = "lambda {}: {}".format(params, A_symb[0, :].dot(coeffs))
+        else:
+            f_l = "lambda {}: np.array({})".format(params, list(A_symb[0, :]))
         res = eval(f_l)
-        # print f_l
     return res
 
 
