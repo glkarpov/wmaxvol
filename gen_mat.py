@@ -689,12 +689,12 @@ if __name__ == '__main__':
     A_size = 5 # number of columns in matrix (numb. of monoms)
     # x_many = np.random.rand((num_p+1)**l, l)
     x_many = np.random.rand(num_pnts, l)
-    A  = GenMat(A_size, x_many, poly=cheb)
+    a  = GenMat(A_size, x_many, poly=cheb)
     A2 = GenMat(A_size, x_many, poly=[cheb]*l)
 
-    print (A)
+    print (a)
     print (A2)
-    print (A-A2)
+    print (a - A2)
 
     exit(0)
 
@@ -710,16 +710,16 @@ if __name__ == '__main__':
     x_in = np.array([list(x)]*l).T
     w_in = np.array([list(w)]*l).T
     x_many, w_many  = CronProdX(w_in, x_in)
-    A = GenMat(A_size, x_many)
-    print (A.shape)
-    print (A)
-    print ("Rank =", np.linalg.matrix_rank(A))
+    a = GenMat(A_size, x_many)
+    print (a.shape)
+    print (a)
+    print ("Rank =", np.linalg.matrix_rank(a))
 
     # Random x's
     x_many = np.random.rand((num_p+1)**l, l)
-    A = GenMat(A_size, x_many)
-    print (A.shape)
-    print ("Rank (random matrx.) =", np.linalg.matrix_rank(A))
+    a = GenMat(A_size, x_many)
+    print (a.shape)
+    print ("Rank (random matrx.) =", np.linalg.matrix_rank(a))
 
     # MAXVOL!!!
     # New, big matrix!
@@ -731,14 +731,14 @@ if __name__ == '__main__':
     x_in = np.array([list(x)]*l).T
     w_in = np.array([list(w)]*l).T
     x_many, w_many  = CronProdX(w_in, x_in)
-    A = GenMat(A_size, x_many)
-    print ("Rank (maxvol matrx) =", np.linalg.matrix_rank(A))
+    a = GenMat(A_size, x_many)
+    print ("Rank (maxvol matrx) =", np.linalg.matrix_rank(a))
 
-    n2 = A.shape[0]/(l+1)
-    for i in xrange(A.shape[0]):
-        A[i, :] *= w_many[i % n2]
-    res, _ = rect_maxvol.rect_maxvol(A, minK=A_size, maxK=A_size, tol=1.0, start_maxvol_iters=10000)
-    A = A[res, :]
+    n2 = a.shape[0] / (l + 1)
+    for i in xrange(a.shape[0]):
+        a[i, :] *= w_many[i % n2]
+    res, _ = rect_maxvol.rect_maxvol(a, minK=A_size, maxK=A_size, tol=1.0, start_maxvol_iters=10000)
+    a = a[res, :]
 
     # remove unnecessary x
     res, x = RenormXAndIdx(res, x_many)

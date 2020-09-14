@@ -2,92 +2,87 @@ from maxvolpy.maxvol import rect_maxvol
 from mva_test import *
 
 
-def C_upd_alpha(C_old, ndim, block_indx, alpha):
+def proj_matrix_upd(c_prev, ndim, block_indx, alpha):
     ix_range = np.arange(ndim * block_indx, ndim * (block_indx + 1))
-    int_prod = np.eye(ndim) + (alpha ** 2 - 1) * np.dot(C_old[ix_range], C_old[ix_range].T)
-    op1 = C_old @ ((alpha ** 2 - 1) * C_old[ix_range, :].T) @ la.inv(int_prod)
-    op2 = op1 @ C_old[ix_range]
-    C_new = (C_old - op2)
-    C_new[:, ix_range] = C_new[:, ix_range] * alpha
-    return C_new
+    int_prod = np.eye(ndim) + (alpha ** 2 - 1) * np.dot(c_prev[ix_range], c_prev[ix_range].T)
+    op1 = c_prev @ ((alpha ** 2 - 1) * c_prev[ix_range, :].T) @ la.inv(int_prod)
+    op2 = op1 @ c_prev[ix_range]
+    c_new = (c_prev - op2)
+    c_new[:, ix_range] = c_new[:, ix_range] * alpha
+    return c_new
 
 
 @jit
-def bmaxvol_sequent_coeff(A, n_iter, bas_length=None, block_size=1, to_use_recalc=False):
-    ndim = block_size
-    n, m = A.shape
+def wmaxvol(a, n_iter, out_dim, bas_length=None, do_mv_precondition=False, to_use_recalc=False):
+    n, m = a.shape
+    n_points = int(n / out_dim)
+    if do_mv_precondition:
+        a, pivs = maxvol_precondition(a, np.arange(n))
+    else:
+        pivs = np.arange(n_points)
+    ndim = out_dim
     if bas_length is None:
         bas_length = max(ndim, m)
     if bas_length > n:
         bas_length = n
-    A_bas = np.copy(A[:bas_length])
-    A_bas_base = np.copy(A_bas)
-    c = np.dot(A, la.pinv(A_bas))
-
+    a_bas = np.copy(a[:bas_length])
+    a_bas_base = np.copy(a_bas)
+    c = np.dot(a, la.pinv(a_bas))
     block_indcs = np.arange(int(n // ndim))
     uniq_base_idx = np.copy(block_indcs[:(int(bas_length // ndim))])
     weights = np.ones(bas_length // ndim)
-    S = cold_start_tens(c, ndim)
+    s = cold_start_tens(c, ndim)
 
     for i in range(n_iter):
-        det_list = la.det(np.eye(ndim) + S)
+        det_list = la.det(np.eye(ndim) + s)
         elem = np.argmax(det_list)
         if elem in uniq_base_idx:
             ix = np.where(uniq_base_idx == elem)[0][0]
             weights[ix] += 1
             if to_use_recalc:
-                C1 = np.copy(c)
-                c = C_upd_alpha(C1, ndim, ix, np.sqrt(weights[ix] / (weights[ix] - 1)))
+                c1 = np.copy(c)
+                c = proj_matrix_upd(c1, ndim, ix, np.sqrt(weights[ix] / (weights[ix] - 1)))
             else:
                 range_new_block = np.arange(ix * ndim, ix * ndim + ndim)
-                A_bas[range_new_block, :] = np.sqrt(weights[ix]) * A_bas_base[range_new_block, :]
-                c = np.dot(A, la.pinv(A_bas))
+                a_bas[range_new_block, :] = np.sqrt(weights[ix]) * a_bas_base[range_new_block, :]
+                c = np.dot(a, la.pinv(a_bas))
         else:
             range_new_block = np.arange(elem * ndim, elem * ndim + ndim)
-            A_bas = np.vstack((A_bas, A[range_new_block]))
-            A_bas_base = np.vstack((A_bas_base, A[range_new_block]))
+            a_bas = np.vstack((a_bas, a[range_new_block]))
+            a_bas_base = np.vstack((a_bas_base, a[range_new_block]))
             uniq_base_idx = np.append(uniq_base_idx, block_indcs[elem])
             weights = np.append(weights, np.array(1))
-            c = np.dot(A, la.pinv(A_bas))
-        S = cold_start_tens(c, ndim)
+            c = np.dot(a, la.pinv(a_bas))
+        s = cold_start_tens(c, ndim)
 
-    return uniq_base_idx, weights
+    return pivs[uniq_base_idx], weights.astype(int)
 
 
 @jit
-def cold_start_tens(C, ndim):
-    m = C.shape[1]
-    num_block = C.shape[0] // ndim
-    if ndim < C.shape[1]:
+def cold_start_tens(c, ndim):
+    m = c.shape[1]
+    num_block = c.shape[0] // ndim
+    if ndim < c.shape[1]:
         S = np.empty((num_block, ndim, ndim))
         for i in range(num_block):
-            S[i, :, :] = np.dot(C[i * ndim:i * ndim + ndim], C[i * ndim:i * ndim + ndim].T)
+            S[i, :, :] = np.dot(c[i * ndim:i * ndim + ndim], c[i * ndim:i * ndim + ndim].T)
     else:
         S = np.empty((num_block, m, m))
         for i in range(num_block):
-            S[i, :, :] = np.dot(C[i * ndim:i * ndim + ndim].T, C[i * ndim:i * ndim + ndim])
+            S[i, :, :] = np.dot(c[i * ndim:i * ndim + ndim].T, c[i * ndim:i * ndim + ndim])
     return S
 
 
-def maxvol_precondition(A, pivs):
-    k = A.shape[1]
-    indc, _ = rect_maxvol(A, maxK=max_pts(k))
+def maxvol_precondition(a, pivs):
+    k = a.shape[1]
+    indc, _ = rect_maxvol(a, maxK=max_pts(k))
     idx_n, idx_o = change_intersept(np.arange(indc.shape[0]), indc)
-    A[idx_n, :] = A[idx_o, :]
+    a[idx_n, :] = a[idx_o, :]
     pivs[idx_n] = pivs[idx_o]
-    return A, pivs
+    return a, pivs
 
 
 def max_pts(m):
     return int(m * (m + 1) / 2)
 
 
-def wmaxvol(a, n_iter, out_dim, do_mv_precondition=True):
-    k = a.shape[1]
-    n_points = int(a.shape[0] / out_dim)
-    if do_mv_precondition:
-        a, pivs = maxvol_precondition(a, np.arange(a.shape[0]))
-    else:
-        pivs = np.arange(n_points)
-    pts, wts = bmaxvol_sequent_coeff(a, n_iter, bas_length=max_pts(k) * out_dim, block_size=out_dim)
-    return pivs[pts], wts.astype(int)
