@@ -315,7 +315,8 @@ def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
 
 
 # @jit
-def rect_block_maxvol(A, nder, Kmax, max_iters, rect_tol=0.05, tol=0.0, debug=False, to_erase=None):
+def rect_block_maxvol(A, block_size, Kmax, max_iters, rect_tol=0.05, tol=0.0, debug=False, to_erase=None):
+    nder = block_size - 1
     assert (A.shape[1] % (nder + 1) == 0)
     assert (A.shape[0] % (nder + 1) == 0)
     assert (Kmax % (nder + 1) == 0)

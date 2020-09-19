@@ -1,9 +1,4 @@
-import numpy as np
-from gen_mat import *
 from wmaxvol import *
-from gen_points import *
-from mva_test import *
-import os
 
 
 class Config:
@@ -93,7 +88,7 @@ class ExperimentRun:
             m = GenMat(setup.max_expansion * setup.out_dim, x, poly=setup.poly, debug=False, pow_p=setup.pow_p,
                        ToGenDiff=setup.derivative)
             if setup.derivative:
-                m = matrix_prep(m, ndim)
+                m = matrix_prep(m, setup.out_dim)
         else:
             m = setup.model_matrix
 
