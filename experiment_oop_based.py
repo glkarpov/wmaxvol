@@ -21,7 +21,7 @@ def main():
                 config.design_dimension = int(currentValue)
             elif currentArgument in ("-d", "--domtype"):
                 config.domain_type = None if currentValue == 'None' else currentValue
-            elif currentArgument in ("-e", "--ndim"):
+            elif currentArgument in ("-e", "--npts"):
                 config.design_space_cardinality = int(currentValue)
     except getopt.GetoptError:
         print('Parsing error')
