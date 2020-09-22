@@ -258,15 +258,14 @@ def rect_block_maxvol_core(A_init, P, nder, Kmax, t=0.05, to_erase=None):
 
 
 @jit
-def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
-    ndim = nder + 1
+def rect_block_core(C, P, block_size, Kmax, t=0.05, to_erase=None):
     n, m = C.shape
-    num_block = n // ndim
-    k = Kmax // ndim
+    num_block = n // block_size
+    k = Kmax // block_size
     Fl = True
-    block_index = m // ndim
+    block_index = m // block_size
 
-    S = cold_start_tens(C, ndim)
+    S = cold_start_tens(C, block_size)
 
     # C_new = np.empty((n, Kmax))
     # C_new[:, :m] = C
@@ -274,12 +273,12 @@ def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
         # C = C_new[:, :block_index*ndim]
 
         # det_list = [la.det(np.eye(ndim) + S[i,:,:]) for i in range(num_block)]
-        det_list = la.det(np.eye(ndim) + S)
+        det_list = la.det(np.eye(block_size) + S)
         elem = np.argmax(det_list[block_index:]) + block_index
 
         if det_list[elem] > (1 + t):
-            range_j_dim = np.arange(block_index * ndim, block_index * ndim + ndim)
-            range_new_block = np.arange(elem * ndim, elem * ndim + ndim)
+            range_j_dim = np.arange(block_index * block_size, block_index * block_size + block_size)
+            range_new_block = np.arange(elem * block_size, elem * block_size + block_size)
 
             S[[block_index, elem], :, :] = S[[elem, block_index], :, :]
             indx_n, indx_o = change_intersept(range_j_dim, range_new_block)
@@ -291,7 +290,7 @@ def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
             # inv_block = la.inv(np.eye(ndim) + C[range_j_dim].dot(C[range_j_dim].T))
             # op3 = C.dot(C[range_j_dim].T.dot(inv_block))
 
-            block = np.eye(ndim) + C[range_j_dim].dot(C[range_j_dim].T)
+            block = np.eye(block_size) + C[range_j_dim].dot(C[range_j_dim].T)
             op3 = C.dot(la.solve(block, C[range_j_dim]).T)
             op4 = np.dot(op3, C[range_j_dim])
 
@@ -304,7 +303,7 @@ def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
                 ###----------------------------------
                 P, C = to_erase(P[range_j_dim], P, C)
                 ###----------------------------------
-            S = cold_start_tens(C, ndim)
+            S = cold_start_tens(C, block_size)
             # C -= op4
             # C_new[:, block_index*ndim:block_index*(ndim)+ndim] = op3
             block_index += 1
@@ -317,9 +316,9 @@ def rect_block_core(C, P, nder, Kmax, t=0.05, to_erase=None):
 # @jit
 def rect_block_maxvol(A, block_size, Kmax, max_iters, rect_tol=0.05, tol=0.0, debug=False, to_erase=None):
     nder = block_size - 1
-    assert (A.shape[1] % (nder + 1) == 0)
-    assert (A.shape[0] % (nder + 1) == 0)
-    assert (Kmax % (nder + 1) == 0)
+    assert (A.shape[1] % block_size == 0)
+    assert (A.shape[0] % block_size == 0)
+    assert (Kmax % block_size == 0)
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
     DebugPrint("Start")
 
@@ -344,6 +343,6 @@ def rect_block_maxvol(A, block_size, Kmax, max_iters, rect_tol=0.05, tol=0.0, de
     #    A1 = A    
     DebugPrint("rect_block_maxvol_core starts")
     # a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
-    a, b, final_perm = rect_block_core(C, bm_perm, nder, Kmax, t=rect_tol, to_erase=to_erase)
+    a, b, final_perm = rect_block_core(C, bm_perm, block_size, Kmax, t=rect_tol, to_erase=to_erase)
     DebugPrint("rect_block_maxvol_core finishes")
     return (final_perm)

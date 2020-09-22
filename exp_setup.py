@@ -1,5 +1,5 @@
 from wmaxvol import *
-
+import os
 
 class Config:
     def __init__(self):
@@ -19,6 +19,7 @@ class Config:
         self.to_apply_mask = False
         self.mask = None
         self.add_name = ''
+        self.save_npz = False
         self.pow_p = 1
 
     def load_external_model(self, model_matrix, out_dim):
@@ -113,3 +114,5 @@ class ExperimentRun:
             # setup.n_iter += expansion * setup.delta_n
             transit_expansion = expansion
             f.flush()
+            if setup.save_npz:
+                np.savez(os.path.join(self.results_folder, "design{}".format(setup.add_name)), pts=des_points, wts=weights)
