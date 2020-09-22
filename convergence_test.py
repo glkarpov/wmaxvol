@@ -3,8 +3,18 @@ import pathlib
 import os
 from exp_setup import *
 
-os.environ['OMP_NUM_THREADS'] = '6'
-print(os.environ['OMP_NUM_THREADS'])
+# For Noisy and Hachiko computations
+# os.environ['OMP_NUM_THREADS'] = '6'
+# print(os.environ['OMP_NUM_THREADS'])
+
+
+to_print_progress = False
+
+
+def debug_print(s):
+    if to_print_progress:
+        print(s)
+        sys.stdout.flush()
 
 
 def convergence_plotter(error_matrix, use_log=False):
@@ -41,6 +51,7 @@ def block_dim_finder(design_dim_arr, mult_arr):
 
 def main():
     cur_pos = str(pathlib.Path(__file__).parent.absolute())
+    # cur_pos = "/trinity/home/g.karpov/maxvol-approximation" # For Zhores
     config = Config()
     global_iters = 1
     try:
@@ -60,6 +71,7 @@ def main():
     except getopt.GetoptError:
         print('Parsing error')
         sys.exit(2)
+    debug_print("Experiment configured with parameters: global iters = {}, local iters = {}, npts = {}, ndim = {}, ex = {}".format(global_iters, config.n_iter, config.design_space_cardinality, config.design_dimension, config.max_expansion))
     config.out_dim = config.design_dimension + 1
     config.derivative = True
     eps_matrix = np.empty((global_iters, config.n_iter))
@@ -79,10 +91,12 @@ def main():
                    ToGenDiff=config.derivative)
         if config.derivative:
             a = matrix_prep(a, config.out_dim)
-        print(np.linalg.matrix_rank(a[:a.shape[1]]))
+        debug_print("Matrix generated on iteration {}, with shape {}".format(i_global, a.shape))
+        debug_print("Rank of upper square submatrix = {}".format(np.linalg.matrix_rank(a[:a.shape[1]])))
         _, wts, eps_i, frac_i = wmaxvol_analysis(a, config.n_iter, config.out_dim, filtration=True)
         eps_matrix[i_global, :] = eps_i
         frac_matrix[i_global, :] = frac_i
+        debug_print("Analysis done on iteration {}".format(i_global))
 
     np.savez(os.path.join(dir_str, exp_name), eps=eps_matrix, frac=frac_matrix)
 
