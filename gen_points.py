@@ -53,7 +53,7 @@ def polar(x):
 def domain_erase(x, mod='blob'):
     erase_list = []
     if mod == 'circle':
-        r0 = 0.8
+        r0 = 0.2
         for i in range(x.shape[0]):
             r, phi = polar(x[i])
             if (r > r0):

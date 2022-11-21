@@ -65,7 +65,7 @@ def sort_like(ar, arn):
     # return  idx_n, idx_o
 
 
-@jit('i8(i8,i8)')
+#@jit('i8(i8,i8)')
 def binom_sh(p,l):
     """
     Shifted binomial:
@@ -85,7 +85,7 @@ def OnesFixed(m, n):
             res[uniq] = True
             yield res
 
-@jit
+#@jit
 def indeces_K(l, q, p=1):
     """
     returns all vectors of length l with sum of indices in power p <= q^p, starting form 0
@@ -142,7 +142,7 @@ def num_of_indeces_K(l, q, max_p):
 
 
 # Some with polynomials
-@jit
+#@jit
 def herm_mult_many(x, xi, poly_func=None):
     """
     INPUT
@@ -370,7 +370,7 @@ legendre.normed = MakeNormPoly(legendre)
 
 # Main func
 
-@jit
+#@jit
 def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True, IsTypeGood=True, poly_vals=None, poly_diff_vals=None):
     """
     INPUT

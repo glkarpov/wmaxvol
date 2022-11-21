@@ -187,7 +187,7 @@ def RHS(function, points, derivative=True):
     Form RH-side from function and its derivative
     """
     nder = points.shape[1]
-    if derivative == True:
+    if derivative:
         ndim = nder + 1
         rhs = np.empty(ndim * points.shape[0], dtype=points.dtype)
         rhs[::ndim] = function(*points.T)
@@ -212,7 +212,7 @@ def gauss_double_sp(x, y):
 
 
 def sincos_sp(x, y):
-    return (sp.sin((x ** 2) / 2. - (y ** 2) / 4. + 3) * sp.cos(2 * x + 1 - sp.exp(y)))
+    return sp.sin((x ** 2) / 2. - (y ** 2) / 4. + 3) * sp.cos(2 * x + 1 - sp.exp(y))
 
 
 def rosenbrock_sp(x, y):
@@ -234,7 +234,7 @@ def yaf1_sp(x, y):
 
 def gabor_sp(x, y):
     a = 1 / (0.5 * np.pi)
-    b = 1 / (0.5)
+    b = 1 / 0.5
     c = 2 * np.pi
     return a * sp.exp(-1 * (x ** 2 + y ** 2) * b) * sp.cos(c * (x + y))
 
@@ -270,7 +270,7 @@ def branin_sp(x, y):
 
 
 def holsclaw_sp(x, y):
-    return (sp.log(1.05 + x + x ** 2 + x * y))
+    return sp.log(1.05 + x + x ** 2 + x * y)
 
 
 def piston(M, S, V_0, k, P_0, T_a, T_0):
@@ -304,7 +304,6 @@ f_gabor = symb_to_func(gabor_sp, 2, True, False, name='Gabor')
 f_ellipse = symb_to_func(ellipse_sp, 2, True, False, name='Ellipse')
 f_piston = symb_to_func(piston, 7, True, False, name='Piston')
 
-
 f_gauss.diff = MakeDiffs(gauss_sp, 2)
 f_gauss_doubl.diff = MakeDiffs(gauss_double_sp, 2)
 f_sincos.diff = MakeDiffs(sincos_sp, 2)
@@ -322,17 +321,38 @@ f_triple.diff = MakeDiffs(triple_sp, 3, True)
 f_piston.diff = MakeDiffs(piston, 7, True)
 
 
-def test_bm(A, x, nder, col_expansion, N_rows, cut_radius=0.15, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
+# def test_bm_with_erasing(A, x, nder, col_expansion, N_rows, cut_radius=0.15, to_save_pivs=True, to_export_pdf=True,
+#                          fnpdf=None):
+#     N_column = col_expansion * (nder + 1)
+#     M = A[:, :N_column]
+#     if to_save_pivs:
+#         if cut_radius is None:
+#             to_erase = None
+#         else:
+#             erase_init(point_erase, x, nder, r=cut_radius)
+#             to_erase = point_erase
+#         pivs = rect_block_maxvol(M, nder, Kmax=N_rows, rect_tol=0.05, tol=0.0, debug=False,
+#                                  to_erase=to_erase)
+#         test_bm.pivs = pivs
+#         test_bm.N_column = N_column
+#     else:
+#         try:
+#             pivs = test_bm.pivs
+#             assert test_bm.N_column == N_column, "Call test with to_save_pivs=True first"
+#         except:
+#             assert False, "Call test with to_save_pivs=True first"
+#
+#     assert pivs.size >= N_rows, "Wrong N_rows value"
+#     cut_piv = pivs[:N_rows]
+#     taken_indices = cut_piv[::(nder + 1)] // (nder + 1)
+#     return taken_indices
+
+
+def test_bm(A, x, nder, col_expansion, N_rows, to_save_pivs=True, to_export_pdf=True, fnpdf=None):
     N_column = col_expansion * (nder + 1)
     M = A[:, :N_column]
     if to_save_pivs:
-        if cut_radius == None:
-            to_erase = None
-        else:
-            erase_init(point_erase, x, nder, r=cut_radius)
-            to_erase = point_erase
-        pivs = rect_block_maxvol(M, nder, Kmax=N_rows, max_iters=100, rect_tol=0.05, tol=0.0, debug=False,
-                                 to_erase=to_erase)
+        pivs = rect_block_maxvol(M, nder, Kmax=N_rows, rect_tol=0.05, tol=0.0, debug=False)
         test_bm.pivs = pivs
         test_bm.N_column = N_column
     else:

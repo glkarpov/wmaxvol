@@ -1,12 +1,11 @@
 from __future__ import print_function
-import numpy as np
+
 import numpy.linalg as la
-from ids import *
-#from ids import SingularError
+# from ids import SingularError
 # from pyDOE import *
-from numba import jit
-import sys
-import math
+from numba import njit
+
+from ids import *
 
 # jit = lambda x : x
 to_print_progress = False
@@ -18,7 +17,7 @@ def DebugPrint(s):
         sys.stdout.flush()
 
 
-###-------------- Service functions ----------------- ###
+#   --- Service functions ---
 # @jit
 def form_permute(C, j, ind):  # REMOVE THIS
     C[ind], C[j] = C[j], C[ind]
@@ -34,9 +33,14 @@ def matrix_prep(A, ndim):
     return A[np.arange(n).reshape(ndim, n // ndim).ravel(order='F')]
 
 
+def row_to_block_indices(row_indices, block_size):
+    block_indx = row_indices[::block_size] // block_size
+    return block_indx
+
+
 # C = A\hat{A}^{-1} fast recalculation with the help of SWM formula
 @jit
-def SWM(B, ndim, i, j):
+def swm_recalculation(B, ndim, i, j):
     tmp_columns = np.copy(B[:, j:j + ndim])
     tmp_columns[j:j + ndim] -= np.eye(ndim)
     tmp_columns[i:i + ndim] += np.eye(ndim)
@@ -47,14 +51,13 @@ def SWM(B, ndim, i, j):
     tmp_rows[:, j:j + ndim] -= np.eye(ndim)
 
     B -= np.dot(tmp_columns, np.dot(np.linalg.inv(b), tmp_rows))
-    return (B)
+    return B
 
 
 def change_intersept(inew, iold):
     """
-    change two sets of rows or columns when indices may intersept with preserving order
-    RETURN two sets of indices,
-    than say A[idx_n] = A[idx_o]
+    change two sets of rows or columns when indices may intercept with preserving order
+    RETURN two sets of indices, then say A[idx_n] = A[idx_o]
     """
 
     # DebugPrint(str(inew) + '<->' + str(iold))
@@ -64,89 +67,20 @@ def change_intersept(inew, iold):
     return idx_n.astype(int), idx_o.astype(int)
 
 
-# stuff to handle with matrix linings. Puts matrix U in the lining of A, i.e. : B = A*UA (default) or B = AUA*.
-class lining:
-    def __init__(self, A, U, inv=False):
-        if not inv:
-            self.left = A.conjugate().T
-            self.right = A
-            self.core = U
-        else:
-            self.left = A
-            self.right = A.conjugate().T
-            self.core = U
-
-    def left_prod(self):
-        return np.dot(self.left, self.core)
-
-    def right_prod(self):
-        return np.dot(self.core, self.right)
-
-    def assemble(self):
-        return np.dot(self.left, self.right_prod())
-
-
-# main func to form new coeff matrix
-# @jit
-def rect_core(C, C_sigma, ndim):
-    inv_block = la.inv(np.eye(ndim) + np.dot(C_sigma, C_sigma.conjugate().T))
-    puzzle = lining(C_sigma, inv_block)
-    U = np.hstack((np.eye(C.shape[1]) - puzzle.assemble(), puzzle.left_prod()))
-    C_new = lining(C, U, inv=True).left_prod()
-    return C_new, puzzle.assemble()
-
-
-# @jit
-def cold_start(C, ndim):
-    n = C.shape[0]
-    values = []
-    for i in range(0, n, ndim):
-        CC_T = np.dot(C[i:i + ndim], C[i:i + ndim].conjugate().T)
-        values.append(CC_T)
-    return values
-
-
-@jit
-def cold_start_tens(C, ndim):
-    num_block = C.shape[0] // ndim
-    S = np.empty((num_block, ndim, ndim))
+@njit
+def cold_start_tens(S, proj_matrix, ndim):
+    num_block = proj_matrix.shape[0] // ndim
     for i in range(num_block):
-        S[i, :, :] = np.dot(C[i * ndim:i * ndim + ndim], C[i * ndim:i * ndim + ndim].T)
-    return (S)
+        S[i, :, :] = proj_matrix[i * ndim:i * ndim + ndim] @ proj_matrix[i * ndim:i * ndim + ndim].T
+    return 0
 
 
-### ------------------------------------
-def erase_init(func, x, nder, r):
-    func.x = x
-    func.nder = nder
-    func.r = r
-
-
-@jit
-def point_erase(p_chosen, p, C):
-    ndim = point_erase.nder + 1
-    P = np.copy(p)
-    ### P - perm vector. [::ndim]//ndim encodes point. 
-    for point_idx in p_chosen[::(ndim)] // (ndim):
-        erase_inx = []
-        for j in P[::(ndim)] // (ndim):
-            if j not in p_chosen[::(ndim)] // (ndim):
-                if np.linalg.norm(point_erase.x[point_idx] - point_erase.x[j], 2) < point_erase.r:
-                    elem = np.where(P == j * ndim)[0]
-                    for idx in range(ndim):
-                        erase_inx.append(elem + idx)
-        P = np.delete(P, erase_inx)
-        C = np.delete(C, erase_inx, axis=0)
-    return (P, C)
-
-
-# @jit
-# def weights_update(
-### -------------- Core algorithm functions -------------- ###
+# --- Core algorithm functions ---
 @jit
 def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd=True, debug=False):
     n, m = A_init.shape
-    ndim = nder + 1
+    dim = nder + 1
+    curr_det = None
     if swm_upd:
         A = A_init
         ids = A_init[:m]
@@ -156,171 +90,110 @@ def block_maxvol(A_init, nder, tol=0.05, max_iters=100, swm_upd=True, debug=Fals
         ids = A[:m]
         B = np.dot(A, np.linalg.inv(ids))
 
-    curr_det = np.abs(np.linalg.det(ids))
-    Fl = True
+    possible_to_swap_blocks = True
     P = np.arange(n)
-    index = np.zeros((2), dtype=int)
+    index = np.zeros(2, dtype=int)
     iters = 0
 
-    while Fl and (iters < max_iters):
+    while possible_to_swap_blocks and (iters < max_iters):
         max_det = 1.0
-        for k in range(m, n, ndim):
-            pair = B[k:k + ndim]
-            for j in range(0, m, ndim):
-                curr_det = np.abs(np.linalg.det(pair[:, j:j + ndim]))
+        for k in range(m, n, dim):
+            pair = B[k:k + dim]
+            for j in range(0, m, dim):
+                curr_det = np.abs(np.linalg.det(pair[:, j:j + dim]))
                 if curr_det > max_det:
                     max_det = curr_det
                     index[0] = k
                     index[1] = j
 
-        if (max_det) > (1 + tol):
+        if max_det > (1 + tol):
             # Forming new permutation array
-            for idx in range(ndim):
+            for idx in range(dim):
                 form_permute(P, index[1] + idx, index[0] + idx)
 
-            if debug == True:
+            if debug:
                 print(P[:m])
-            if (swm_upd == True) and (debug == True):
-                print('on the {} iteration with swm, pair {} {} chosen and pair{}'.format(iters, index[0], index[1],
-                                                                                          B[index[0]:index[0] + ndim][:,
-                                                                                          index[1]:index[1] + ndim]))
-            if (swm_upd == False) and (debug == True):
-                print(
-                    'on the {} iteration with stan.oper, pair {} {} chosen and pair{}'.format(iters, index[0], index[1],
+                if swm_upd:
+                    print('on the {} iteration with swm, pair {} {} chosen and pair{}'.format(iters, index[0], index[1],
                                                                                               B[
-                                                                                              index[0]:index[0] + ndim][
-                                                                                              :, index[1]:index[
-                                                                                                              1] + ndim]))
-            ### Recalculating with new rows position
-            if swm_upd == True:
-                B = SWM(B, ndim, index[0], index[1])
-                # for idx in range(ndim):
+                                                                                              index[0]:index[0] + dim][
+                                                                                              :,
+                                                                                              index[1]:index[1] + dim]))
+                if not swm_upd:
+                    print(
+                        'on the {} iteration with stan.oper, pair {} {} chosen and pair{}'.format(iters, index[0],
+                                                                                                  index[1],
+                                                                                                  B[
+                                                                                                  index[0]:index[
+                                                                                                               0] + dim][
+                                                                                                  :, index[1]:index[
+                                                                                                                  1] + dim]))
+            # Recalculating with new rows position
+            if swm_upd:
+                B = swm_recalculation(B, dim, index[0], index[1])
+                # for idx in range(dim):
                 # mov_row(A,index[1] + idx,index[0] + idx)
 
             else:
-                for idx in range(ndim):
+                for idx in range(dim):
                     mov_row(A, index[1] + idx, index[0] + idx)
                 B = np.dot(A, np.linalg.inv(ids))
 
             iters += 1
         else:
-            Fl = False
-    return (P, B)
-
-
-# @jit
-def rect_block_maxvol_core(A_init, P, nder, Kmax, t=0.05, to_erase=None):
-    ndim = nder + 1
-    M, n = A_init.shape
-    block_n = M // ndim  # Whole amount of blocks in matrix A
-    # P = p #np.arange(M) # Permutation vector
-    Fl = True
-    Fl_cs = True
-    ids_init = A_init[:n]
-    temp_init = np.dot(A_init, np.linalg.pinv(ids_init))
-    C = np.copy(temp_init)
-
-    shape_index = n
-    CC_sigma = []
-
-    while Fl and (shape_index < Kmax):
-
-        block_index = shape_index // ndim
-
-        if Fl_cs:
-            CC_sigma = cold_start(C, ndim)
-            Fl_cs = False
-
-        ind_array = la.det(np.eye(ndim) + CC_sigma)
-        elem = np.argmax(ind_array[block_index:]) + block_index
-
-        if (ind_array[elem] > 1 + t):
-            CC_sigma[block_index], CC_sigma[elem] = CC_sigma[elem], CC_sigma[block_index]
-            for idx in range(ndim):
-                form_permute(P, shape_index + idx, elem * ndim + idx)
-                mov_row(C, shape_index + idx, elem * ndim + idx)
-            C_new, line = rect_core(C, C[shape_index:shape_index + ndim], ndim)
-            if to_erase is not None:
-                ###----------------------------------
-                P, C_new = to_erase(P[shape_index:shape_index + ndim], P, C_new)
-                ###----------------------------------
-            ### update list of CC_sigma
-            # for k in range(len(CC_sigma)):
-            # CC_sigma[k] = CC_sigma[k] - np.dot(C_w[k*ndim:ndim*(k+1)], np.dot(line, C_w[k*ndim:ndim*(k+1)].conjugate().T))
-            C = C_new
-            CC_sigma = cold_start(C, ndim)
-        else:
-            print('No relevant elements found')
-            Fl = False
-
-        shape_index += ndim
-    return (C, CC_sigma, P)
+            possible_to_swap_blocks = False
+    return P, B
 
 
 @jit
-def rect_block_core(C, P, block_size, Kmax, t=0.05, to_erase=None):
-    n, m = C.shape
-    num_block = n // block_size
-    k = Kmax // block_size
-    Fl = True
-    block_index = m // block_size
-
-    S = cold_start_tens(C, block_size)
-
-    # C_new = np.empty((n, Kmax))
-    # C_new[:, :m] = C
-    while Fl and block_index < k:
-        # C = C_new[:, :block_index*ndim]
-
-        # det_list = [la.det(np.eye(ndim) + S[i,:,:]) for i in range(num_block)]
-        det_list = la.det(np.eye(block_size) + S)
+def rect_block_core(init_proj_matrix, perm_vec, dim, Kmax, t=0.05):
+    n, m = init_proj_matrix.shape
+    k = Kmax // dim
+    possible_to_add_block = True
+    block_index = m // dim
+    S = np.empty((n // dim, dim, dim))
+    proj_matrix_expanded = np.empty((n, Kmax))
+    proj_matrix_expanded[:, :m] = init_proj_matrix
+    proj_matrix = proj_matrix_expanded[:, :m]
+    cold_start_tens(S, proj_matrix, dim)
+    while possible_to_add_block and block_index < k:
+        det_list = [la.det(np.eye(dim) + S[i, :, :]) for i in range(n // dim)]
         elem = np.argmax(det_list[block_index:]) + block_index
 
         if det_list[elem] > (1 + t):
-            range_j_dim = np.arange(block_index * block_size, block_index * block_size + block_size)
-            range_new_block = np.arange(elem * block_size, elem * block_size + block_size)
+            range_j_dim = np.arange(block_index * dim, (block_index + 1) * dim)
+            range_new_block = np.arange(elem * dim, elem * dim + dim)
 
             S[[block_index, elem], :, :] = S[[elem, block_index], :, :]
             indx_n, indx_o = change_intersept(range_j_dim, range_new_block)
 
-            P[indx_n] = P[indx_o]
-            C[indx_n] = C[indx_o]
+            perm_vec[indx_n] = perm_vec[indx_o]
+            proj_matrix[indx_n] = proj_matrix[indx_o]
 
             # ------ update part -----
-            # inv_block = la.inv(np.eye(ndim) + C[range_j_dim].dot(C[range_j_dim].T))
-            # op3 = C.dot(C[range_j_dim].T.dot(inv_block))
+            block = np.eye(dim) + proj_matrix[range_j_dim].dot(proj_matrix[range_j_dim].T)
+            op3 = proj_matrix.dot(la.solve(block, proj_matrix[range_j_dim]).T)
+            op4 = np.dot(op3, proj_matrix[range_j_dim])
 
-            block = np.eye(block_size) + C[range_j_dim].dot(C[range_j_dim].T)
-            op3 = C.dot(la.solve(block, C[range_j_dim]).T)
-            op4 = np.dot(op3, C[range_j_dim])
-
-            # for i in range(block_index, num_block):
-            #   i_ndim = i*ndim
-            #    S[i,:,:] -= np.dot(op4[i_ndim:i_ndim + ndim],C[i_ndim:i_ndim + ndim].T)
-
-            C = np.hstack((C - op4, op3))
-            if to_erase is not None:
-                ###----------------------------------
-                P, C = to_erase(P[range_j_dim], P, C)
-                ###----------------------------------
-            S = cold_start_tens(C, block_size)
-            # C -= op4
-            # C_new[:, block_index*ndim:block_index*(ndim)+ndim] = op3
+            proj_matrix -= op4
+            proj_matrix_expanded[:, block_index * dim:(block_index + 1) * dim] = op3
             block_index += 1
+
+            proj_matrix = proj_matrix_expanded[:, :block_index * dim]
+            cold_start_tens(S, proj_matrix, dim)
         else:
             # print('No relevant elements found')
-            Fl = False
-    return (C, S, P)
+            possible_to_add_block = False
+    return proj_matrix, S, perm_vec
 
 
-# @jit
-def rect_block_maxvol(A, block_size, Kmax, max_iters, rect_tol=0.05, tol=0.0, debug=False, to_erase=None):
-    nder = block_size - 1
-    assert (A.shape[1] % block_size == 0)
-    assert (A.shape[0] % block_size == 0)
-    assert (Kmax % block_size == 0)
+@jit
+def rect_block_maxvol(A, nder, Kmax, rect_tol=0.05, tol=0.0, debug=False):
+    assert (A.shape[1] % (nder + 1) == 0)
+    assert (A.shape[0] % (nder + 1) == 0)
+    assert (Kmax % (nder + 1) == 0)
     assert ((Kmax <= A.shape[0]) and (Kmax >= A.shape[1]))
-    DebugPrint("Start")
+    # DebugPrint("Start")
 
     try:
         pluq_perm, lu = plu_ids(A, nder, overwrite_a=False)
@@ -333,16 +206,8 @@ def rect_block_maxvol(A, block_size, Kmax, max_iters, rect_tol=0.05, tol=0.0, de
     perm, C = block_maxvol(A, nder, tol=tol, max_iters=200, swm_upd=True)
     DebugPrint("block_maxvol finishes")
 
-    A = A[perm]
     bm_perm = pluq_perm[perm]
-    ### Perform erasure after we got initial points in square matrix
-    if to_erase is not None:
-        # A1 = np.copy(A)
-        bm_perm, C = to_erase(bm_perm[:C.shape[1]], bm_perm, C)
-    # else:
-    #    A1 = A    
     DebugPrint("rect_block_maxvol_core starts")
-    # a, b, final_perm = rect_block_maxvol_core(A, bm_perm, nder, Kmax, t = rect_tol, to_erase = to_erase)
-    a, b, final_perm = rect_block_core(C, bm_perm, block_size, Kmax, t=rect_tol, to_erase=to_erase)
+    a, b, final_perm = rect_block_core(C, bm_perm, nder + 1, Kmax, t=rect_tol)
     DebugPrint("rect_block_maxvol_core finishes")
-    return (final_perm)
+    return final_perm

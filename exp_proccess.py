@@ -4,6 +4,7 @@ import os
 
 class Experiment:
     def __init__(self, path_dspace, path_calculated_design, design_dim, out_dim):
+        self.mask = None
         self.design_space_path = path_dspace
         self.ndim = design_dim
         self.out_dim = out_dim
