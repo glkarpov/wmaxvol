@@ -235,7 +235,7 @@ def complex_area_pnts_gen(n_test, nder, mod, distrib):
         if mod is not None:
             x_temp = domain_erase(x_temp, mod=mod)
         try:
-            return (x_temp[:n_test])
+            return x_temp[:n_test]
         except:
             k = int(1.5 * k)
             pass

@@ -57,7 +57,7 @@ def grad(points, poly=gen.cheb):
         T_deriv[:, i] = poly.diff(points_flat, i)
         T_val[:, i]   = poly     (points_flat, i)
 
-    A = gen.GenMat(num_col, points, poly_vals=T_val, indeces=idx,  ToGenDiff=False)
+    A = gen.GenMat(num_col, points, poly_vals=T_val, indices=idx, ToGenDiff=False)
 
     _, S, V = LA.svd(A, full_matrices = False)
     S[ S < tol ] = tol

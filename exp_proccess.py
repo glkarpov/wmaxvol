@@ -176,6 +176,7 @@ def submask(mask, crt_mask):
     return rt
 
 
+@jit
 def mult_error_tensor(N_iter, mask, function, points_test, error_set, poly_basis, pow_poly=1, shape=None,
                       derivative=False):
     ndim = points_test.shape[1]
@@ -199,10 +200,10 @@ def mult_error_tensor(N_iter, mask, function, points_test, error_set, poly_basis
                         if len((np.where(x_tmp == np.array([[0., 0.], ])))[0]) == 0:
                             break
                 if function == [None]:
-                    error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=poly_basis, test_pnts=points_test,
+                    error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp * (ndim + 1), poly=poly_basis, test_pnts=points_test,
                                                           pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
                 else:
-                    _, error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp, poly=poly_basis, test_pnts=points_test,
+                    _, error_tensor[k][i, s] = LebesgueConst(x_tmp, col_exp * (ndim + 1), poly=poly_basis, test_pnts=points_test,
                                                              pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
     return error_tensor
 
@@ -215,12 +216,10 @@ def maxvol_error(x, function, points_test, p_indices, n_col, mask, derivative=Tr
     if type(function) is not list:
         function = [function]
     ValsandNorms = MakeValsAndNorms(function, points_test)
-    print(mask)
     for i in range(mask.shape[0]):
         rows_exp, col_exp = mask[i, 0], n_col[mask[i, 1]]
         p = p_indices[mask[i, 1]][:rows_exp]
-        print(p)
         _, b = LebesgueConst(x[p], col_exp * (ndim + 1), poly=cheb, test_pnts=points_test, pow_p=1, funcs=ValsandNorms,
                              derivative=derivative)
         error_bmaxvol.append(b)
-    return np.array(error_bmaxvol).reshape((1, len(error_bmaxvol)))
+    return np.array(error_bmaxvol).reshape(-1)

@@ -85,7 +85,7 @@ def wmatrix_constr(basis_rows, weight):
     return res
 
 
-# @jit
+@jit
 def LebesgueConst(pnts, l, poly=cheb, test_pnts=None, pow_p=1, wts=None, funcs=None, derivative=False):
     A = GenMat(l, pnts, poly=poly, debug=False, pow_p=pow_p, ToGenDiff=derivative)
 
