@@ -1,5 +1,4 @@
 import getopt
-import os
 import pathlib
 
 from exp_proccess import *
@@ -183,22 +182,31 @@ def process_error_for_plot(sampling_types, error_dict, block_size, min_exp, max_
 
 
 def main():
-    N_iter = 100
+    N_iter = 4
+    col_to_fix = []
+    point_to_fix = []
+    slice_coeff = []
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'a:b:c:', ['ndim=', 'func=', 'add_param='])
+        opts, args = getopt.getopt(sys.argv[1:], 'a:b:c:d:e:',
+                                   ['add_param=', 'func=', 'col_fix=', 'pts_fix=', 'slice='])
         for currentArgument, currentValue in opts:
-            if currentArgument in ("-a", "--ndim"):
-                ndim = int(currentValue)
+            if currentArgument in ("-a", "--add_param"):
+                add_name = None if currentValue == 'None' else '_' + str(currentValue)
             elif currentArgument in ("-b", "--func"):
                 function = None if currentValue == 'None' else eval(currentValue)
-            elif currentArgument in ("-c", "--add_param"):
-                add_name = None if currentValue == 'None' else '_' + str(currentValue)
+            elif currentArgument in ("-c", "--col_fix"):
+                col_to_fix = [] if currentValue == 'None' else [int(v) for v in currentValue.split(',')]
+            elif currentArgument in ("-d", "--pts_fix"):
+                point_to_fix = [] if currentValue == 'None' else [int(v) for v in currentValue.split(',')]
+            elif currentArgument in ("-e", "--slice"):
+                slice_coeff = [] if currentValue == 'None' else [float(v) for v in currentValue.split(',')]
+
     except getopt.GetoptError:
         print('Parsing error')
         sys.exit(2)
 
     cur_pos = str(pathlib.Path(__file__).parent.absolute())
-    exp_name = "doe_exp_dim={}".format(ndim)
+    exp_name = "doe_exp"
     exp_dir = os.path.join(cur_pos, exp_name + add_name)
 
     calc_design = 'distrib=LHS.txt'
@@ -206,35 +214,32 @@ def main():
 
     path_calculated_design = os.path.join(exp_dir, calc_design)
     path_generated_pts = os.path.join(exp_dir, pts_filename)
-    N_row, N_col, pts_indices = file_extraction(path_calculated_design)
-    min_exp, max_exp = np.min(N_col), np.max(N_col)
-    max_pts = int(np.max(N_row) / (ndim + 1))
-    design_dict = extracted_design_to_dict(N_row, N_col, pts_indices, ndim + 1)
-    # pow_p = 1
-    poly_type = cheb
+
     domain = np.load(path_generated_pts)
     points_test = domain['points_test']
     design_space = domain['x']
+    n_dim = design_space.shape[1]
+
+    n_row, n_col, pts_indices = file_extraction(path_calculated_design)
+    min_exp, max_exp = np.min(n_col), np.max(n_col)
+    max_pts = int(np.max(n_row) / (n_dim + 1))
+    design_dict = extracted_design_to_dict(n_row, n_col, pts_indices, n_dim + 1)
+    # pow_p = 1
+    poly_type = cheb
 
     # Experiment setup
     error_blank = ('lhs', 'sobol', 'random')
 
-    solve_all_mesh = True
-    col_to_fix = []
-    point_to_fix = []
-    slice_coeff = []
-
-    exp_solve = [[], [], []]
-    if solve_all_mesh:
-            exp_solve = [np.arange(min_exp, max_exp + 1), [], []]
+    if len(col_to_fix) + len(point_to_fix) + len(slice_coeff) == 0:
+        exp_solve = [np.arange(min_exp, max_exp + 1), [], []]
     else:
-        exp_solve[0] = col_to_fix
-        exp_solve[1] = point_to_fix
-        exp_solve[2] = slice_coeff
+        exp_solve = [col_to_fix, point_to_fix, slice_coeff]
+        print(exp_solve)
 
-    error_storage_dict = process_experiment_scheme(exp_solve, error_blank, ndim + 1, min_exp, max_exp, max_pts)
+    error_storage_dict = process_experiment_scheme(exp_solve, error_blank, n_dim + 1, min_exp, max_exp, max_pts)
     model_error_calculation(N_iter, function, points_test, error_storage_dict, poly_basis=cheb, derivative=True)
-    bmaxvol_stat = bmaxvol_error(function, points_test, design_space, design_dict, error_storage_dict, poly_basis=poly_type)
+    bmaxvol_stat = bmaxvol_error(function, points_test, design_space, design_dict, error_storage_dict,
+                                 poly_basis=poly_type)
 
     if function is None:
         tensor_name = 'error_leb'
