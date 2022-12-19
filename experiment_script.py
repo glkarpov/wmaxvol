@@ -2,7 +2,7 @@ import getopt
 
 from mva_test import *
 import os
-os.environ['OMP_NUM_THREADS'] = '6'
+os.environ['OMP_NUM_THREADS'] = '4'
 print(os.environ['OMP_NUM_THREADS'])
 
 
@@ -10,7 +10,7 @@ def main():
     global min_expansion, max_expansion, max_row
     domain_type = None
     nder = 2
-    num_points_for_big_matrix = 200
+    num_points_for_big_matrix = 10000
     n_test = 5000  # points on test grid (for calculating error on final step)
     cut_radius = 0.005
     add_str = ""
