@@ -49,7 +49,7 @@ def main():
     points_fn = 'taken_points_{}'.format(initial_points_distrib)
     try:
         taken_points = np.load(os.path.join(dir_str, points_fn) + ".npz")
-        design_space = taken_points['design_space']
+        design_space = taken_points['x']
         print("Successful reading of data created before!")
     except:
         design_space = complex_area_pnts_gen(num_points_for_big_matrix, nder, distrib='lhs', mod=domain_type)
