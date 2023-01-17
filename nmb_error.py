@@ -3,7 +3,7 @@ import pathlib
 
 from exp_proccess import *
 
-os.environ['OMP_NUM_THREADS'] = '6'
+os.environ['OMP_NUM_THREADS'] = '4'
 print(os.environ['OMP_NUM_THREADS'])
 
 
@@ -39,9 +39,9 @@ def model_error_calculation(n_iter, function, points_test, error_dict, poly_basi
     if type(function) is not list:
         function = [function]
     if function == [None]:
-        ValsandNorms = None
+        vals_and_norms = None
     else:
-        ValsandNorms = MakeValsAndNorms(function, points_test)
+        vals_and_norms = MakeValsAndNorms(function, points_test)
     for s in np.arange(n_iter):
         print('Iteration #{}'.format(s))
         for model_matrix_size in error_dict:
@@ -58,10 +58,10 @@ def model_error_calculation(n_iter, function, points_test, error_dict, poly_basi
                             break
                 if function == [None]:
                     error = LebesgueConst(x_tmp, n_col, poly=poly_basis, test_pnts=points_test,
-                                          pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
+                                          pow_p=pow_poly, funcs=vals_and_norms, derivative=derivative)
                 else:
                     _, error = LebesgueConst(x_tmp, n_col, poly=poly_basis, test_pnts=points_test,
-                                             pow_p=pow_poly, funcs=ValsandNorms, derivative=derivative)
+                                             pow_p=pow_poly, funcs=vals_and_norms, derivative=derivative)
                 error_at_sampling[sampling_type].append(error)
 
     return True
@@ -70,10 +70,12 @@ def model_error_calculation(n_iter, function, points_test, error_dict, poly_basi
 def extracted_design_to_dict(row_array, col_array, idx_array, block_size):
     design_dict = dict()
     assert (row_array.shape[0] == col_array.shape[0])
-
+    tmp_col_value = None
     for i in range(row_array.shape[0]):
         design_dict[(row_array[i], col_array[i] * block_size)] = idx_array[i]
-
+        if tmp_col_value != col_array[i]:
+            tmp_col_value = col_array[i]
+            design_dict[(tmp_col_value * block_size, tmp_col_value * block_size)] = idx_array[i][:tmp_col_value]
     return design_dict
 
 
@@ -182,7 +184,7 @@ def process_error_for_plot(sampling_types, error_dict, block_size, min_exp, max_
 
 
 def main():
-    N_iter = 4
+    n_iter = 100
     col_to_fix = []
     point_to_fix = []
     slice_coeff = []
@@ -224,7 +226,8 @@ def main():
     min_exp, max_exp = np.min(n_col), np.max(n_col)
     max_pts = int(np.max(n_row) / (n_dim + 1))
     design_dict = extracted_design_to_dict(n_row, n_col, pts_indices, n_dim + 1)
-    # pow_p = 1
+
+    pow_p = 1
     poly_type = cheb
 
     # Experiment setup
@@ -237,7 +240,7 @@ def main():
         print(exp_solve)
 
     error_storage_dict = process_experiment_scheme(exp_solve, error_blank, n_dim + 1, min_exp, max_exp, max_pts)
-    model_error_calculation(N_iter, function, points_test, error_storage_dict, poly_basis=cheb, derivative=True)
+    model_error_calculation(n_iter, function, points_test, error_storage_dict, poly_basis=cheb, derivative=True)
     bmaxvol_stat = bmaxvol_error(function, points_test, design_space, design_dict, error_storage_dict,
                                  poly_basis=poly_type)
 
