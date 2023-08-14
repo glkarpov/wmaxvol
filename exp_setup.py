@@ -1,6 +1,7 @@
 from wmaxvol import *
 import os
 
+
 class Config:
     def __init__(self):
         self.min_expansion = None
@@ -115,4 +116,5 @@ class ExperimentRun:
             transit_expansion = expansion
             f.flush()
             if setup.save_npz:
-                np.savez(os.path.join(self.results_folder, "design{}".format(setup.add_name)), pts=des_points, wts=weights)
+                np.savez(os.path.join(self.results_folder, "design{}".format(setup.add_name)), pts=des_points,
+                         wts=weights)
