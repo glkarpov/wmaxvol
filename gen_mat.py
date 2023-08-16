@@ -27,7 +27,7 @@ xrange = range
 sqrt_pi = np.sqrt(np.pi)
 sqrt_pi2 = np.sqrt(np.pi*2)
 
-@jit
+#@jit
 def ReverseIdx(idx):
     """
     returns Reverse permutation
@@ -42,7 +42,7 @@ def ReverseIdx(idx):
 
     return NumToIdxInv
 
-@jit
+#@jit
 def sort_like(ar, arn):
     """
     RETURNS idx so that
@@ -51,7 +51,7 @@ def sort_like(ar, arn):
     return np.argsort(ReverseIdx(ar)[arn])
 
 
-# @jit
+# #@jit
 # def change_intersept(inew, iold):
     # """
     # change two sets of rows or columns when indices may intercept with preserving order
@@ -65,7 +65,7 @@ def sort_like(ar, arn):
     # return  idx_n, idx_o
 
 
-@jit('i8(i8,i8)')
+#@jit('i8(i8,i8)')
 def binom_sh(p,l):
     """
     Shifted binomial:
@@ -85,7 +85,7 @@ def OnesFixed(m, n):
             res[uniq] = True
             yield res
 
-@jit
+#@jit
 def indeces_K(l, q, p=1):
     """
     returns all vectors of length l with sum of indices in power p <= q^p, starting form 0
@@ -142,7 +142,7 @@ def num_of_indeces_K(l, q, max_p):
 
 
 # Some with polynomials
-@jit
+#@jit
 def herm_mult_many(x, xi, poly_func=None):
     """
     INPUT
@@ -171,7 +171,7 @@ def herm_mult_many(x, xi, poly_func=None):
     return res
 
 
-@jit
+#@jit
 def herm_mult_many_diff(x, xi, diff_var, poly_func=None):
     """
     INPUT
@@ -266,7 +266,7 @@ herm_nn.diff = herm_diff_nn
 herm_nn.snorm = herm_snorm
 
 
-@jit
+#@jit
 def herm(x, n):
     """
     returns H_n(x)
@@ -278,7 +278,7 @@ def herm(x, n):
     nc = np.sqrt(float(rnp.math.factorial(n))) # norm
     return (2**(-float(n)*0.5))*hermval(x/np.sqrt(2.0), cf)/nc
 
-# @jit
+# #@jit
 def herm_diff(x, n):
     if n <= 0:
         return x*0.0
@@ -297,7 +297,7 @@ def herm_norm_snorm(n):
 herm.diff = herm_diff
 herm.snorm = herm_norm_snorm
 
-# @jit
+# #@jit
 def trigpoly(xin, n, interval=(-1,1)):
     """
     return sin(n x) or cos(n x)
@@ -315,7 +315,7 @@ def trigpoly(xin, n, interval=(-1,1)):
 
     return func(tpow*x)
 
-# @jit
+# #@jit
 def trigpoly_diff(xin, n, interval=(-1,1)):
     if n==0:
         return x*0.0
@@ -329,7 +329,7 @@ def trigpoly_diff(xin, n, interval=(-1,1)):
 trigpoly.diff = trigpoly_diff
 
 
-@jit
+#@jit
 def legendre(x, n, interval=(-1.0, 1.0)):
     """
     Non-normed poly
@@ -337,7 +337,7 @@ def legendre(x, n, interval=(-1.0, 1.0)):
     xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
     return L.basis(n)(xn)
 
-@jit
+#@jit
 def legendre_diff(x, n, interval=(-1.0, 1.0)):
     xn = (interval[0] + interval[1] - 2.0*x)/(interval[0] - interval[1])
     return L.basis(n).deriv(1)(xn)
@@ -370,7 +370,7 @@ legendre.normed = MakeNormPoly(legendre)
 
 # Main func
 
-@jit
+#@jit
 def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=None, ToGenDiff=True, IsTypeGood=True, poly_vals=None, poly_diff_vals=None):
     """
     INPUT
@@ -526,7 +526,7 @@ def GenMat(n_size, x, poly=None, poly_diff=None, debug=False, pow_p=1, indeces=N
     return A
 
 
-@jit
+#@jit
 def GenFunc(coeffs, l, poly=None, poly_diff=None, debug=False, pow_p=1, ToGenDiff=False):
     """
     Generates a function that gives RH using given points and solution

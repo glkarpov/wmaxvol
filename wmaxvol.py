@@ -78,7 +78,7 @@ def maxvol_precondition(a, pivs, block_size):
     if block_size == 1:
         indc, _ = rect_maxvol(a, maxK=max_pts(k))
     else:
-        indc = rect_block_maxvol(a, block_size, k, max_iters=100)
+        indc = rect_block_maxvol(a, block_size - 1, k, max_iters=100)
     idx_n, idx_o = change_intersept(np.arange(indc.shape[0]), indc)
     a[idx_n, :] = a[idx_o, :]
     pivs[idx_n] = pivs[idx_o]
@@ -106,6 +106,7 @@ def get_variance(a, m, out_dim):
 def wmaxvol_analysis(a, n_iter, out_dim, filtration=True, bas_length=None, do_mv_precondition=True):
     n, m = a.shape
     n_points = int(n / out_dim)
+    print(a.shape, out_dim)
     if do_mv_precondition:
         a, pivs = maxvol_precondition(a, np.arange(n), out_dim)
     else:
@@ -186,9 +187,11 @@ def wmaxvol_analysis(a, n_iter, out_dim, filtration=True, bas_length=None, do_mv
         sensitivity_vec = get_variance(a, current_inf_matrix, ndim)
         sens_max = np.max(sensitivity_vec[uniq_base_idx]) if np.max(sensitivity_vec[uniq_base_idx]) > m else m
         sens_min = np.min(sensitivity_vec[uniq_base_idx]) if np.min(sensitivity_vec[uniq_base_idx]) < m else m
-        eps.append(np.abs(sens_max - sens_min))
+        # eps.append(np.abs(sens_max - sens_min))
+        eps.append(np.abs(sens_max - sens_min) / m)
         outer_design_space = np.setdiff1d(block_indcs, uniq_base_idx)
-        error_idcs = np.where(sensitivity_vec[outer_design_space] >= m)[0]
+        # error_idcs = np.where(sensitivity_vec[outer_design_space] >= m)[0]
+        error_idcs = np.where(sensitivity_vec[outer_design_space] >= sens_min)[0]
         n_upper.append(float(error_idcs.shape[0] / n_points))
     # print(sensitivity_vec[uniq_base_idx], 'sensitivity on design')
     # print(uniq_base_idx)
